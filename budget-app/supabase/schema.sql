@@ -98,7 +98,7 @@ INSERT INTO categories (name, sub_name, icon, color, order_num) VALUES
 -- ============================================
 INSERT INTO cards (owner, name, sms_keyword, is_auto_parse) VALUES
   ('gaeun',   '로카 365',   '[로카]',   true),
-  ('incheon', '로카 라이키','[로카]',   true),
+  ('incheon', '로카 LIKIT', '[로카]',   true),
   ('incheon', '삼성카드',   NULL,        false),
   ('gaeun',   '체크카드',   NULL,        false),
   ('shared',  '현금',       NULL,        false);

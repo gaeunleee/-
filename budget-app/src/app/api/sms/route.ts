@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { parseSMS, guessCategory } from '@/lib/sms-parser'
+import { parseSMS } from '@/lib/sms-parser'
 import { createServiceClient } from '@/lib/supabase'
 
 // iOS 단축어에서 호출하는 SMS webhook
@@ -9,16 +9,13 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { sms, card, secret } = body
 
-    // 인증 확인
     if (secret !== process.env.SMS_WEBHOOK_SECRET) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
     if (!sms) {
       return NextResponse.json({ error: 'SMS text required' }, { status: 400 })
     }
 
-    // SMS 파싱
     const parsed = parseSMS(sms, card)
     if (!parsed) {
       return NextResponse.json({ error: 'Failed to parse SMS', raw: sms }, { status: 422 })
@@ -33,21 +30,22 @@ export async function POST(req: NextRequest) {
       .eq('name', parsed.cardName)
       .single()
 
-    // 가맹점으로 카테고리 추측
-    const guessed = guessCategory(parsed.merchant)
+    // 카테고리 ID 조회
     let categoryId: string | null = null
-
-    if (guessed) {
-      const { data: catData } = await supabase
+    if (parsed.categoryName && parsed.categoryName !== '기타') {
+      const query = supabase
         .from('categories')
         .select('id')
-        .eq('name', guessed.name)
-        .eq('sub_name', guessed.sub)
-        .single()
+        .eq('name', parsed.categoryName)
+
+      const { data: catData } = parsed.categorySub
+        ? await query.eq('sub_name', parsed.categorySub).single()
+        : await query.limit(1).single()
+
       categoryId = catData?.id ?? null
     }
 
-    // DB에 자동 기입
+    // DB 기입
     const { data, error } = await supabase
       .from('transactions')
       .insert({
@@ -69,8 +67,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       transaction: data,
-      parsed,
-      categoryGuessed: !!categoryId,
+      parsed: {
+        amount: parsed.amount,
+        merchant: parsed.merchant,
+        date: parsed.date,
+        cardName: parsed.cardName,
+        owner: parsed.owner,
+        category: `${parsed.categoryName} · ${parsed.categorySub}`,
+        isSharedForced: parsed.isSharedForced,
+      },
     })
   } catch (err) {
     console.error('SMS webhook error:', err)
