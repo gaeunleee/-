@@ -13,8 +13,8 @@ const LOCA_PATTERNS = [
 
 // 카드 소유자 판별 키워드
 const OWNER_KEYWORDS: Record<string, Owner> = {
-  '365':    'incheon',  // 로카 365 → 인천
-  '라이키': 'gaeun',   // 로카 라이키 → 가은
+  '365':    'gaeun',    // 로카 365 → 가은
+  '라이키': 'incheon',  // 로카 라이키 → 인천
 }
 
 export function parseSMS(smsText: string, senderCard?: string): ParsedSMS | null {
@@ -72,11 +72,11 @@ export function parseSMS(smsText: string, senderCard?: string): ParsedSMS | null
 
   // senderCard가 명시된 경우 우선 적용
   if (senderCard) {
-    if (senderCard.includes('365')) owner = 'incheon'
-    else if (senderCard.includes('라이키')) owner = 'gaeun'
+    if (senderCard.includes('365')) owner = 'gaeun'
+    else if (senderCard.includes('라이키')) owner = 'incheon'
   }
 
-  const cardName = owner === 'incheon' ? '로카 365' : '로카 라이키'
+  const cardName = owner === 'gaeun' ? '로카 365' : '로카 라이키'
 
   return { amount, merchant, date: dateStr, cardName, owner }
 }
