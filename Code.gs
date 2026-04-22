@@ -8,8 +8,9 @@
 const SUPABASE_URL = 'https://onojnsqzisheaevphplu.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_5jdCIAmhtgcKGFjs-msNWg_dERKcluP';
 
-const TELEGRAM_TOKEN = '8254217822:AAGIDEhnBzxDEJU0cuUp1haYpIHrMke2z98';
-const TELEGRAM_API   = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN;
+const TELEGRAM_TOKEN  = '8254217822:AAGIDEhnBzxDEJU0cuUp1haYpIHrMke2z98';
+const TELEGRAM_API    = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN;
+const SPREADSHEET_ID  = '1HDhrERTUA8R6lTulXVLBltODbqwYYKETQ7Jd5r40WxU';
 
 // ── 상수 ──────────────────────────────────────────────────────
 
