@@ -325,10 +325,8 @@ function getMonthSheet(ss, date) {
   var name = (date.getMonth() + 1) + '월';
   var sheet = ss.getSheetByName(name);
   if (!sheet) {
-    SpreadsheetApp.getUi().alert(
-      '"' + name + '" 시트를 찾을 수 없습니다.\n해당 월 시트를 생성한 후 다시 시도하세요.'
-    );
-    return null;
+    Logger.log('"' + name + '" 시트 없음 - 자동 생성');
+    sheet = ss.insertSheet(name);
   }
   return sheet;
 }
