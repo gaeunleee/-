@@ -74,8 +74,9 @@ function doPost(e) {
     var chatId = msg.chat.id;
     var text   = msg.text.trim();
 
-    // 카드 승인 문자가 아니면 무시
+    // 카드 승인 문자가 아니면 채팅 ID 알려주기
     if (text.indexOf('원') === -1 || text.indexOf('승인') === -1) {
+      sendTelegramMessage(chatId, '내 채팅 ID: ' + chatId);
       return ContentService.createTextOutput('ok');
     }
 
