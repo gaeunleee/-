@@ -8,6 +8,9 @@
 const SUPABASE_URL = 'https://onojnsqzisheaevphplu.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_5jdCIAmhtgcKGFjs-msNWg_dERKcluP';
 
+const TELEGRAM_TOKEN = '8254217822:AAGIDEhnBzxDEJU0cuUp1haYpIHrMke2z98';
+const TELEGRAM_API   = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN;
+
 // ── 상수 ──────────────────────────────────────────────────────
 
 const DATA_START_ROW = 2;
@@ -58,6 +61,54 @@ const NON_MERCHANT_PATTERNS = [
 ];
 
 const DATE_FORMAT = 'm"월" d"일"';
+
+// ── 텔레그램 웹훅 ─────────────────────────────────────────────
+
+function doPost(e) {
+  try {
+    var update = JSON.parse(e.postData.contents);
+    var msg = update.message || update.channel_post;
+    if (!msg || !msg.text) return ContentService.createTextOutput('ok');
+
+    var chatId = msg.chat.id;
+    var text   = msg.text.trim();
+
+    // 카드 승인 문자가 아니면 무시
+    if (text.indexOf('원') === -1 || text.indexOf('승인') === -1) {
+      return ContentService.createTextOutput('ok');
+    }
+
+    var parsed = parseCardMessage(text);
+    if (!parsed) {
+      sendTelegramMessage(chatId, '파싱 실패: 카드 승인 문자 형식을 확인해주세요.');
+      return ContentService.createTextOutput('ok');
+    }
+
+    var classification = classifyExpense(parsed);
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var monthSheet = getMonthSheet(ss, parsed.date);
+    if (monthSheet) writeRecord(monthSheet, parsed, classification);
+    saveToSupabase(parsed, classification);
+
+    var ownerLabel = classification.type === 'joint' ? '공동' : classification.owner === 'gaeun' ? '가은' : '인천';
+    var reply = '✅ ' + parsed.merchant + ' ' + parsed.amount.toLocaleString() + '원\n'
+              + ownerLabel + ' ' + classification.category + ' 기록 완료';
+    sendTelegramMessage(chatId, reply);
+
+  } catch (err) {
+    Logger.log('doPost 오류: ' + err.toString());
+  }
+  return ContentService.createTextOutput('ok');
+}
+
+function sendTelegramMessage(chatId, text) {
+  UrlFetchApp.fetch(TELEGRAM_API + '/sendMessage', {
+    method:      'post',
+    contentType: 'application/json',
+    payload:     JSON.stringify({ chat_id: chatId, text: text }),
+    muteHttpExceptions: true
+  });
+}
 
 // ── 메인 트리거 ────────────────────────────────────────────────
 
