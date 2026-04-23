@@ -491,6 +491,117 @@ function getCardId(cardName) {
   return data.length > 0 ? data[0].id : null;
 }
 
+// ── 월말 리포트 ────────────────────────────────────────────────
+
+function setupMonthlyTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'checkAndSendMonthlyReport') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('checkAndSendMonthlyReport')
+    .timeBased()
+    .everyDays(1)
+    .atHour(22)
+    .create();
+  Logger.log('월말 리포트 트리거 설정 완료 (매일 22시 실행)');
+}
+
+function checkAndSendMonthlyReport() {
+  var today = new Date();
+  var tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+  if (tomorrow.getDate() !== 1) return;
+  sendMonthlyReport(today);
+}
+
+function sendMonthlyReport(date) {
+  var monthNum  = date.getMonth() + 1;
+  var monthName = monthNum + '월';
+
+  try {
+    var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = ss.getSheetByName(monthName);
+    if (!sheet) {
+      sendTelegramMessage(MY_CHAT_ID, monthName + ' 데이터가 없습니다.');
+      return;
+    }
+
+    var lastRow = sheet.getLastRow();
+    if (lastRow < DATA_START_ROW) {
+      sendTelegramMessage(MY_CHAT_ID, monthName + ' 기록된 지출이 없습니다.');
+      return;
+    }
+
+    var numRows = lastRow - DATA_START_ROW + 1;
+    var allData = sheet.getRange(DATA_START_ROW, 1, numRows, 20).getValues();
+
+    var incheonTotal = 0, gaeunTotal = 0, jointTotal = 0;
+    var incheonCats = {}, gaeunCats = {}, jointCats = {};
+
+    for (var i = 0; i < allData.length; i++) {
+      var row = allData[i];
+
+      if (row[0] !== '' && row[1] > 0) {
+        incheonTotal += row[1];
+        incheonCats[row[2] || '기타'] = (incheonCats[row[2] || '기타'] || 0) + row[1];
+      }
+      if (row[7] !== '' && row[8] > 0) {
+        gaeunTotal += row[8];
+        gaeunCats[row[9] || '기타'] = (gaeunCats[row[9] || '기타'] || 0) + row[8];
+      }
+      if (row[14] !== '' && row[15] > 0) {
+        jointTotal += row[15];
+        jointCats[row[16] || '기타'] = (jointCats[row[16] || '기타'] || 0) + row[15];
+      }
+    }
+
+    var total = incheonTotal + gaeunTotal + jointTotal;
+    var report = '📊 ' + monthName + ' 가계부 결산\n\n';
+    report += '━━━━━━━━━━━━━━\n';
+    report += '💰 지출 합계\n';
+    report += '• 공동: ' + jointTotal.toLocaleString() + '원\n';
+    report += '• 가은 개인: ' + gaeunTotal.toLocaleString() + '원\n';
+    report += '• 인천 개인: ' + incheonTotal.toLocaleString() + '원\n';
+    report += '• 전체: ' + total.toLocaleString() + '원\n\n';
+
+    if (Object.keys(jointCats).length > 0) {
+      report += '🏠 공동 지출\n';
+      var js = sortByValue(jointCats);
+      for (var j = 0; j < Math.min(js.length, 5); j++) {
+        report += '  ' + js[j][0] + ' ' + js[j][1].toLocaleString() + '원\n';
+      }
+      report += '\n';
+    }
+    if (Object.keys(gaeunCats).length > 0) {
+      report += '👩 가은 개인\n';
+      var gs = sortByValue(gaeunCats);
+      for (var j = 0; j < Math.min(gs.length, 5); j++) {
+        report += '  ' + gs[j][0] + ' ' + gs[j][1].toLocaleString() + '원\n';
+      }
+      report += '\n';
+    }
+    if (Object.keys(incheonCats).length > 0) {
+      report += '👨 인천 개인\n';
+      var is = sortByValue(incheonCats);
+      for (var j = 0; j < Math.min(is.length, 5); j++) {
+        report += '  ' + is[j][0] + ' ' + is[j][1].toLocaleString() + '원\n';
+      }
+    }
+
+    sendTelegramMessage(MY_CHAT_ID, report);
+  } catch (err) {
+    Logger.log('월간 리포트 오류: ' + err.toString());
+  }
+}
+
+function sortByValue(obj) {
+  var arr = [];
+  for (var key in obj) arr.push([key, obj[key]]);
+  arr.sort(function(a, b) { return b[1] - a[1]; });
+  return arr;
+}
+
 // ── 수동 테스트 함수 ───────────────────────────────────────────
 
 function testParse() {
