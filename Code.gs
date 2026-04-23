@@ -13,6 +13,13 @@ const TELEGRAM_API    = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN;
 const SPREADSHEET_ID  = '1HDhrERTUA8R6lTulXVLBltODbqwYYKETQ7Jd5r40WxU';
 const MY_CHAT_ID      = 8727551535;
 
+const BUDGET = { joint: 1100000, gaeun: 600000, incheon: 600000 };
+
+const NEWLYWED_CAT_AVG = {
+  joint:    { '외식': 500000, '생활비': 400000, '여가': 200000, '교통비': 100000, '의료비': 80000 },
+  personal: { '외식': 200000, '여가': 100000, '교통비': 80000, '의료비': 50000 },
+};
+
 // ── 상수 ──────────────────────────────────────────────────────
 
 const DATA_START_ROW = 2;
@@ -96,8 +103,17 @@ function doPost(e) {
 }
 
 function processSms(chatId, text) {
-  if (text.indexOf('원') === -1 || text.indexOf('승인') === -1) {
+  var hasAmount   = text.indexOf('원') !== -1;
+  var hasApproval = text.indexOf('승인') !== -1;
+  var hasCancel   = text.indexOf('취소') !== -1;
+
+  if (!hasAmount || (!hasApproval && !hasCancel)) {
     sendTelegramMessage(chatId, '내 채팅 ID: ' + chatId);
+    return;
+  }
+
+  if (hasCancel && !hasApproval) {
+    handleCancellation(chatId, text);
     return;
   }
 
@@ -116,11 +132,83 @@ function processSms(chatId, text) {
   try {
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var monthSheet = getMonthSheet(ss, parsed.date);
-    if (monthSheet) writeRecord(monthSheet, parsed, classification);
+    if (monthSheet) {
+      if (!isDuplicate(monthSheet, parsed, classification)) {
+        writeRecord(monthSheet, parsed, classification);
+      } else {
+        sendTelegramMessage(chatId, '⚠️ 중복 감지 — 이미 기록된 내역입니다.');
+      }
+    }
   } catch (sheetErr) {
     Logger.log('시트 오류: ' + sheetErr.toString());
   }
   saveToSupabase(parsed, classification);
+}
+
+function handleCancellation(chatId, text) {
+  var parsed = parseCardMessage(text.replace(/취소/g, '승인'));
+  if (!parsed) {
+    sendTelegramMessage(chatId, '⚠️ 취소 문자 파싱 실패 — 수동 확인 필요');
+    return;
+  }
+  var classification = classifyExpense(parsed);
+  var deleted = deleteRecord(parsed, classification);
+  if (deleted) {
+    sendTelegramMessage(chatId, '🗑️ ' + parsed.merchant + ' ' + parsed.amount.toLocaleString() + '원 취소 처리 완료');
+  } else {
+    sendTelegramMessage(chatId, '⚠️ ' + parsed.merchant + ' ' + parsed.amount.toLocaleString() + '원 취소 — 기존 기록 없음, 수동 확인 필요');
+  }
+}
+
+function isDuplicate(sheet, parsed, classification) {
+  var lastRow = sheet.getLastRow();
+  if (lastRow < DATA_START_ROW) return false;
+  var numRows = lastRow - DATA_START_ROW + 1;
+  var type = classification.type;
+  var owner = classification.owner;
+  var dateCol = (type === 'joint') ? 15 : (owner === 'incheon') ? 1 : 8;
+  var data = sheet.getRange(DATA_START_ROW, dateCol, numRows, 2).getValues();
+  var pd = parsed.date;
+  for (var i = 0; i < data.length; i++) {
+    var d = data[i][0];
+    if (!d || !(d instanceof Date)) continue;
+    if (d.getFullYear() === pd.getFullYear() &&
+        d.getMonth()    === pd.getMonth()    &&
+        d.getDate()     === pd.getDate()     &&
+        data[i][1]      === parsed.amount) return true;
+  }
+  return false;
+}
+
+function deleteRecord(parsed, classification) {
+  try {
+    var ss   = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var sheet = getMonthSheet(ss, parsed.date);
+    var lastRow = sheet.getLastRow();
+    if (lastRow < DATA_START_ROW) return false;
+    var numRows = lastRow - DATA_START_ROW + 1;
+    var type  = classification.type;
+    var owner = classification.owner;
+    var dateCol = (type === 'joint') ? 15 : (owner === 'incheon') ? 1 : 8;
+    var startCol = dateCol;
+    var data = sheet.getRange(DATA_START_ROW, dateCol, numRows, 2).getValues();
+    var pd = parsed.date;
+    for (var i = numRows - 1; i >= 0; i--) {
+      var d = data[i][0];
+      if (!d || !(d instanceof Date)) continue;
+      if (d.getFullYear() === pd.getFullYear() &&
+          d.getMonth()    === pd.getMonth()    &&
+          d.getDate()     === pd.getDate()     &&
+          data[i][1]      === parsed.amount) {
+        sheet.getRange(DATA_START_ROW + i, startCol, 1, 6).clearContent();
+        return true;
+      }
+    }
+    return false;
+  } catch (err) {
+    Logger.log('deleteRecord 오류: ' + err.toString());
+    return false;
+  }
 }
 
 function sendTelegramMessage(chatId, text) {
@@ -522,16 +610,10 @@ function sendMonthlyReport(date) {
   try {
     var ss    = SpreadsheetApp.openById(SPREADSHEET_ID);
     var sheet = ss.getSheetByName(monthName);
-    if (!sheet) {
-      sendTelegramMessage(MY_CHAT_ID, monthName + ' 데이터가 없습니다.');
-      return;
-    }
+    if (!sheet) { sendTelegramMessage(MY_CHAT_ID, monthName + ' 데이터가 없습니다.'); return; }
 
     var lastRow = sheet.getLastRow();
-    if (lastRow < DATA_START_ROW) {
-      sendTelegramMessage(MY_CHAT_ID, monthName + ' 기록된 지출이 없습니다.');
-      return;
-    }
+    if (lastRow < DATA_START_ROW) { sendTelegramMessage(MY_CHAT_ID, monthName + ' 기록 없음'); return; }
 
     var numRows = lastRow - DATA_START_ROW + 1;
     var allData = sheet.getRange(DATA_START_ROW, 1, numRows, 20).getValues();
@@ -541,58 +623,107 @@ function sendMonthlyReport(date) {
 
     for (var i = 0; i < allData.length; i++) {
       var row = allData[i];
-
       if (row[0] !== '' && row[1] > 0) {
         incheonTotal += row[1];
-        incheonCats[row[2] || '기타'] = (incheonCats[row[2] || '기타'] || 0) + row[1];
+        var ic = row[2] || '기타';
+        incheonCats[ic] = (incheonCats[ic] || 0) + row[1];
       }
       if (row[7] !== '' && row[8] > 0) {
         gaeunTotal += row[8];
-        gaeunCats[row[9] || '기타'] = (gaeunCats[row[9] || '기타'] || 0) + row[8];
+        var gc = row[9] || '기타';
+        gaeunCats[gc] = (gaeunCats[gc] || 0) + row[8];
       }
       if (row[14] !== '' && row[15] > 0) {
         jointTotal += row[15];
-        jointCats[row[16] || '기타'] = (jointCats[row[16] || '기타'] || 0) + row[15];
+        var jc = row[16] || '기타';
+        jointCats[jc] = (jointCats[jc] || 0) + row[15];
       }
     }
 
     var total = incheonTotal + gaeunTotal + jointTotal;
-    var report = '📊 ' + monthName + ' 가계부 결산\n\n';
-    report += '━━━━━━━━━━━━━━\n';
-    report += '💰 지출 합계\n';
-    report += '• 공동: ' + jointTotal.toLocaleString() + '원\n';
-    report += '• 가은 개인: ' + gaeunTotal.toLocaleString() + '원\n';
-    report += '• 인천 개인: ' + incheonTotal.toLocaleString() + '원\n';
-    report += '• 전체: ' + total.toLocaleString() + '원\n\n';
 
-    if (Object.keys(jointCats).length > 0) {
-      report += '🏠 공동 지출\n';
-      var js = sortByValue(jointCats);
-      for (var j = 0; j < Math.min(js.length, 5); j++) {
-        report += '  ' + js[j][0] + ' ' + js[j][1].toLocaleString() + '원\n';
-      }
-      report += '\n';
-    }
-    if (Object.keys(gaeunCats).length > 0) {
-      report += '👩 가은 개인\n';
-      var gs = sortByValue(gaeunCats);
-      for (var j = 0; j < Math.min(gs.length, 5); j++) {
-        report += '  ' + gs[j][0] + ' ' + gs[j][1].toLocaleString() + '원\n';
-      }
-      report += '\n';
-    }
-    if (Object.keys(incheonCats).length > 0) {
-      report += '👨 인천 개인\n';
-      var is = sortByValue(incheonCats);
-      for (var j = 0; j < Math.min(is.length, 5); j++) {
-        report += '  ' + is[j][0] + ' ' + is[j][1].toLocaleString() + '원\n';
-      }
+    var r = '📊 ' + monthName + ' 가계부 결산\n';
+    r += '━━━━━━━━━━━━━━\n\n';
+
+    // 예산 대비
+    r += '💰 예산 대비 지출\n';
+    r += budgetLine('🏠 공동', jointTotal,   BUDGET.joint);
+    r += budgetLine('👩 가은', gaeunTotal,   BUDGET.gaeun);
+    r += budgetLine('👨 인천', incheonTotal, BUDGET.incheon);
+    r += '합계 ' + total.toLocaleString() + '원\n\n';
+
+    // 카테고리 상세
+    r += '━━━━━━━━━━━━━━\n';
+    r += '📋 카테고리별 상세\n\n';
+    r += catDetail('🏠 공동', jointCats,   NEWLYWED_CAT_AVG.joint);
+    r += catDetail('👩 가은', gaeunCats,   NEWLYWED_CAT_AVG.personal);
+    r += catDetail('👨 인천', incheonCats, NEWLYWED_CAT_AVG.personal);
+
+    // 절약 포인트
+    var tips = makeTips(jointTotal, gaeunTotal, incheonTotal, jointCats, gaeunCats, incheonCats);
+    if (tips) {
+      r += '━━━━━━━━━━━━━━\n';
+      r += '💡 이달의 절약 포인트\n' + tips;
     }
 
-    sendTelegramMessage(MY_CHAT_ID, report);
+    sendTelegramMessage(MY_CHAT_ID, r);
   } catch (err) {
     Logger.log('월간 리포트 오류: ' + err.toString());
   }
+}
+
+function budgetLine(label, actual, budget) {
+  var diff = budget - actual;
+  var pct  = Math.round(Math.abs(diff) / budget * 100);
+  var mark = diff >= 0 ? '✅' : '⚠️';
+  var desc = diff >= 0
+    ? actual.toLocaleString() + '원 / ' + budget.toLocaleString() + '원 (' + pct + '% 절약) ' + mark
+    : actual.toLocaleString() + '원 / ' + budget.toLocaleString() + '원 (' + pct + '% 초과) ' + mark;
+  return label + ' ' + desc + '\n';
+}
+
+function catDetail(label, cats, avg) {
+  var sorted = sortByValue(cats);
+  if (sorted.length === 0) return '';
+  var s = label + '\n';
+  for (var i = 0; i < Math.min(sorted.length, 5); i++) {
+    var cat = sorted[i][0];
+    var amt = sorted[i][1];
+    var ref = avg[cat];
+    var mark = '';
+    if (ref && amt > ref) mark = ' ⚠️ 평균 초과';
+    s += '  • ' + cat + ' ' + amt.toLocaleString() + '원' + mark + '\n';
+  }
+  return s + '\n';
+}
+
+function makeTips(jt, gt, it, jCats, gCats, iCats) {
+  var tips = '';
+  if (jt > BUDGET.joint)   tips += '• 공동 지출 예산 ' + (jt - BUDGET.joint).toLocaleString() + '원 초과\n';
+  if (gt > BUDGET.gaeun)   tips += '• 가은 개인 예산 ' + (gt - BUDGET.gaeun).toLocaleString() + '원 초과\n';
+  if (it > BUDGET.incheon) tips += '• 인천 개인 예산 ' + (it - BUDGET.incheon).toLocaleString() + '원 초과\n';
+
+  // 카테고리별 신혼 평균 초과 체크
+  function checkCats(cats, avg, who) {
+    for (var cat in cats) {
+      if (avg[cat] && cats[cat] > avg[cat] * 1.3) {
+        tips += '• ' + who + ' ' + cat + '비 신혼 평균 대비 '
+              + Math.round(cats[cat] / avg[cat] * 100 - 100) + '% 많음\n';
+      }
+    }
+  }
+  checkCats(jCats, NEWLYWED_CAT_AVG.joint,    '공동');
+  checkCats(gCats, NEWLYWED_CAT_AVG.personal, '가은');
+  checkCats(iCats, NEWLYWED_CAT_AVG.personal, '인천');
+
+  // 외식 합산 체크
+  var totalEat = (jCats['외식'] || 0) + (gCats['외식'] || 0) + (iCats['외식'] || 0);
+  if (totalEat > 900000) {
+    tips += '• 외식 합산 ' + totalEat.toLocaleString() + '원 — 신혼부부 평균 외식비(70만원) 초과\n';
+  }
+
+  if (!tips) tips = '• 이달은 예산 내에서 잘 관리했습니다 👍\n';
+  return tips;
 }
 
 function sortByValue(obj) {
