@@ -17,7 +17,7 @@ const MY_CHAT_ID      = 8727551535;
 
 const DATA_START_ROW = 2;
 
-const JOINT_MERCHANTS = ['지엠마트', '정육점', '다이소', '신선지엠'];
+const JOINT_MERCHANTS = ['지엠마트', '정육점', '다이소', '신선지엠', '슈퍼', '청과'];
 const PERSONAL_MERCHANTS = ['올리브영', '미용실', '헤어'];
 
 const CATEGORY_KEYWORDS = {
@@ -25,7 +25,7 @@ const CATEGORY_KEYWORDS = {
   '의료비': ['병원', '의원', '약국', '클리닉', '한의원', '치과', '안과', '피부과', '정형외과'],
   '여가':   ['영화', '카페', '커피빈', '스타벅스', '투썸', '할리스', 'CGV', '메가박스', '롯데시네마', '노래방', 'PC방', '볼링', '헬스', '피트니스', '당구'],
   '여행':   ['호텔', '숙박', '펜션', '항공', '여행사', '리조트', '모텔', '게스트하우스'],
-  '생활비': ['마트', '편의점', 'GS25', 'CU', '세븐일레븐', '이마트24', '세탁', '이마트', '홈플러스', '롯데마트', '쿠팡', '배달의민족', '요기요'],
+  '생활비': ['마트', '세탁', '이마트', '홈플러스', '롯데마트', '쿠팡'],
 };
 
 // DB categories 테이블 기본 sub_name 매핑
@@ -40,12 +40,12 @@ const CATEGORY_SUB_MAP = {
 
 // DB cards 테이블 name과 일치하도록 맞춤
 const CARD_PATTERNS = [
-  { pattern: /롯데3\*3\*/,              card: '로카 LIKIT', owner: 'incheon' },
-  { pattern: /롯데7\*4\*/,              card: '로카 365',   owner: 'gaeun'   },
-  { pattern: /LIKIT/i,                  card: '로카 LIKIT', owner: 'incheon' },
-  { pattern: /\b365\b/,                 card: '로카 365',   owner: 'gaeun'   },
-  { pattern: /삼성카드|삼성페이/,       card: '삼성카드',   owner: 'incheon' },
-  { pattern: /국민카드|KB카드|KB국민/,  card: '국민카드',   owner: 'incheon' },
+  { pattern: /롯데3.3./,               card: '인천 로카', owner: 'incheon' },
+  { pattern: /롯데7.4./,               card: '가은 로카', owner: 'gaeun'   },
+  { pattern: /LIKIT/i,                 card: '인천 로카', owner: 'incheon' },
+  { pattern: /\b365\b/,                card: '가은 로카', owner: 'gaeun'   },
+  { pattern: /삼성카드|삼성페이/,      card: '삼성카드',  owner: 'incheon' },
+  { pattern: /국민카드|KB카드|KB국민/, card: '국민카드',  owner: 'incheon' },
 ];
 
 const NON_MERCHANT_PATTERNS = [
@@ -269,6 +269,15 @@ function parseCardMessage(msg) {
     break;
   }
 
+  // 단일 줄 SMS 형식 fallback: [Web발신] 가맹점 금액원 승인 ...
+  if (!merchant) {
+    var fm = msg.match(/\[Web발신\]\s+(.+?)\s+[\d,]+원/);
+    if (fm) {
+      var cand = fm[1].trim();
+      if (cand.length >= 2) merchant = cleanMerchantName(cand);
+    }
+  }
+
   if (!date || !merchant || amount <= 0) {
     Logger.log('불완전 파싱 - date:' + date + ', merchant:"' + merchant + '", amount:' + amount);
     return null;
@@ -319,7 +328,7 @@ function classifyExpense(parsed) {
 
   if (time) {
     var totalMin = time.hour * 60 + time.min;
-    if (totalMin >= 8 * 60 && totalMin <= 18 * 60 + 30) {
+    if (totalMin >= 8 * 60 && totalMin < 19 * 60) {
       return { type: 'personal', category: determineCategory(merchant), owner: cardOwner };
     }
   }
