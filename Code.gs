@@ -297,6 +297,7 @@ function cleanMerchantName(name) {
     .replace(/\s*\d+점$/, '')
     .replace(/\s*점\d+호$/, '')
     .replace(/\s*점$/, '')
+    .replace(/\s+[가-힣]+$/, '')
     .trim();
 }
 
