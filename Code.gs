@@ -11,6 +11,7 @@ const SUPABASE_KEY = 'sb_publishable_5jdCIAmhtgcKGFjs-msNWg_dERKcluP';
 const TELEGRAM_TOKEN  = '8254217822:AAGIDEhnBzxDEJU0cuUp1haYpIHrMke2z98';
 const TELEGRAM_API    = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN;
 const SPREADSHEET_ID  = '1HDhrERTUA8R6lTulXVLBltODbqwYYKETQ7Jd5r40WxU';
+const MY_CHAT_ID      = 8727551535;
 
 // ── 상수 ──────────────────────────────────────────────────────
 
@@ -71,44 +72,55 @@ const DATE_FORMAT = 'm"월" d"일"';
 
 function doPost(e) {
   try {
-    var update = JSON.parse(e.postData.contents);
-    var msg = update.message || update.channel_post;
+    var body = JSON.parse(e.postData.contents);
+
+    // iPhone 단축어에서 직접 보낸 경우
+    if (body.sms_text) {
+      var smsText = body.sms_text.trim().normalize('NFC');
+      processSms(MY_CHAT_ID, smsText);
+      return ContentService.createTextOutput('ok');
+    }
+
+    // 텔레그램 웹훅 형식
+    var msg = body.message || body.channel_post;
     if (!msg || !msg.text) return ContentService.createTextOutput('ok');
 
     var chatId = msg.chat.id;
-    var text   = msg.text.trim();
-
-    // 카드 승인 문자가 아니면 채팅 ID 알려주기
-    if (text.indexOf('원') === -1 || text.indexOf('승인') === -1) {
-      sendTelegramMessage(chatId, '내 채팅 ID: ' + chatId);
-      return ContentService.createTextOutput('ok');
-    }
-
-    var parsed = parseCardMessage(text);
-    if (!parsed) {
-      sendTelegramMessage(chatId, '파싱 실패: 카드 승인 문자 형식을 확인해주세요.');
-      return ContentService.createTextOutput('ok');
-    }
-
-    var classification = classifyExpense(parsed);
-    var ownerLabel = classification.type === 'joint' ? '공동' : classification.owner === 'gaeun' ? '가은' : '인천';
-    var reply = '✅ ' + parsed.merchant + ' ' + parsed.amount.toLocaleString() + '원\n'
-              + ownerLabel + ' ' + classification.category + ' 기록 완료';
-    sendTelegramMessage(chatId, reply);
-
-    try {
-      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-      var monthSheet = getMonthSheet(ss, parsed.date);
-      if (monthSheet) writeRecord(monthSheet, parsed, classification);
-    } catch (sheetErr) {
-      Logger.log('시트 오류: ' + sheetErr.toString());
-    }
-    saveToSupabase(parsed, classification);
+    var text   = msg.text.trim().normalize('NFC');
+    processSms(chatId, text);
 
   } catch (err) {
     Logger.log('doPost 오류: ' + err.toString());
   }
   return ContentService.createTextOutput('ok');
+}
+
+function processSms(chatId, text) {
+  if (text.indexOf('원') === -1 || text.indexOf('승인') === -1) {
+    sendTelegramMessage(chatId, '내 채팅 ID: ' + chatId);
+    return;
+  }
+
+  var parsed = parseCardMessage(text);
+  if (!parsed) {
+    sendTelegramMessage(chatId, '파싱 실패: 카드 승인 문자 형식을 확인해주세요.');
+    return;
+  }
+
+  var classification = classifyExpense(parsed);
+  var ownerLabel = classification.type === 'joint' ? '공동' : classification.owner === 'gaeun' ? '가은' : '인천';
+  var reply = '✅ ' + parsed.merchant + ' ' + parsed.amount.toLocaleString() + '원\n'
+            + ownerLabel + ' ' + classification.category + ' 기록 완료';
+  sendTelegramMessage(chatId, reply);
+
+  try {
+    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+    var monthSheet = getMonthSheet(ss, parsed.date);
+    if (monthSheet) writeRecord(monthSheet, parsed, classification);
+  } catch (sheetErr) {
+    Logger.log('시트 오류: ' + sheetErr.toString());
+  }
+  saveToSupabase(parsed, classification);
 }
 
 function sendTelegramMessage(chatId, text) {
