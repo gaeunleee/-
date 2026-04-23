@@ -39,6 +39,8 @@ const CATEGORY_SUB_MAP = {
 
 // DB cards 테이블 name과 일치하도록 맞춤
 const CARD_PATTERNS = [
+  { pattern: /롯데3\*3\*/,              card: '로카 LIKIT', owner: 'incheon' },
+  { pattern: /롯데7\*4\*/,              card: '로카 365',   owner: 'gaeun'   },
   { pattern: /LIKIT/i,                  card: '로카 LIKIT', owner: 'incheon' },
   { pattern: /\b365\b/,                 card: '로카 365',   owner: 'gaeun'   },
   { pattern: /삼성카드|삼성페이/,       card: '삼성카드',   owner: 'incheon' },
@@ -59,6 +61,8 @@ const NON_MERCHANT_PATTERNS = [
   /\[.*\]/,
   /^\d{1,2}일\s*$/,
   /^[0-9\-\s]+$/,
+  /롯데\d+\*/,
+  /누적[\d,]+원/,
 ];
 
 const DATE_FORMAT = 'm"월" d"일"';
@@ -87,15 +91,19 @@ function doPost(e) {
     }
 
     var classification = classifyExpense(parsed);
-    var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
-    var monthSheet = getMonthSheet(ss, parsed.date);
-    if (monthSheet) writeRecord(monthSheet, parsed, classification);
-    saveToSupabase(parsed, classification);
-
     var ownerLabel = classification.type === 'joint' ? '공동' : classification.owner === 'gaeun' ? '가은' : '인천';
     var reply = '✅ ' + parsed.merchant + ' ' + parsed.amount.toLocaleString() + '원\n'
               + ownerLabel + ' ' + classification.category + ' 기록 완료';
     sendTelegramMessage(chatId, reply);
+
+    try {
+      var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+      var monthSheet = getMonthSheet(ss, parsed.date);
+      if (monthSheet) writeRecord(monthSheet, parsed, classification);
+    } catch (sheetErr) {
+      Logger.log('시트 오류: ' + sheetErr.toString());
+    }
+    saveToSupabase(parsed, classification);
 
   } catch (err) {
     Logger.log('doPost 오류: ' + err.toString());
