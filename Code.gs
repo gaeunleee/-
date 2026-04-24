@@ -77,8 +77,13 @@ const DATE_FORMAT = 'm"월" d"일"';
 
 // ── 텔레그램 웹훅 ─────────────────────────────────────────────
 
+function doGet(e) {
+  return ContentService.createTextOutput('✅ 가계부 앱스 스크립트 정상 실행 중');
+}
+
 function doPost(e) {
   try {
+    Logger.log('doPost 수신: ' + (e.postData ? e.postData.contents.substring(0, 200) : '없음'));
     var body = JSON.parse(e.postData.contents);
 
     // iPhone 단축어에서 직접 보낸 경우
@@ -98,6 +103,7 @@ function doPost(e) {
 
   } catch (err) {
     Logger.log('doPost 오류: ' + err.toString());
+    try { sendTelegramMessage(MY_CHAT_ID, '❌ 가계부 오류: ' + err.toString()); } catch (e2) {}
   }
   return ContentService.createTextOutput('ok');
 }
