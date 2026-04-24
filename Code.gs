@@ -83,7 +83,11 @@ function doGet(e) {
 
 function doPost(e) {
   try {
-    Logger.log('doPost 수신: ' + (e.postData ? e.postData.contents.substring(0, 200) : '없음'));
+    if (!e || !e.postData || !e.postData.contents) {
+      Logger.log('doPost: 요청 본문 없음');
+      return ContentService.createTextOutput('ok');
+    }
+    Logger.log('doPost 수신: ' + e.postData.contents.substring(0, 200));
     var body = JSON.parse(e.postData.contents);
 
     // iPhone 단축어에서 직접 보낸 경우
