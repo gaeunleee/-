@@ -1,7 +1,7 @@
 const https = require('https');
 const { spawn } = require('child_process');
 
-const TELEGRAM_TOKEN = '8254217822:AAGIDEhnBzxDEJU0cuUp1haYpIHrMke2z98';
+const TELEGRAM_TOKEN = '8521350924:AAEElry8SllGT93ILmmRFjrkeTzhUQzZP4Q';
 const ALLOWED_CHAT_ID = 8727551535;
 
 let offset = 0;
