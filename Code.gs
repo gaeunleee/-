@@ -3,8 +3,10 @@
  *
  * [흐름]
  *   iPhone 문자 수신
- *     → 단축어가 텔레그램 봇으로 전달 (또는 직접 doPost 호출)
- *     → doPost() 파싱 → 시트 기록 → 텔레그램 결과 알림
+ *     → 단축어(자동화)가 doPost 호출
+ *     → 텔레그램에 원본 문자 전송
+ *     → 파싱 → 시트 기록
+ *     → 텔레그램에 결과 전송
  *
  * [시트 구조]
  *   인천 지출: A(날짜) B(금액) C(카테고리) D(가맹점) F(카드)
@@ -59,24 +61,24 @@ var NON_MERCHANT_PATTERNS = [
 var DATE_FORMAT = 'm"월" d"일"';
 
 // ── 웹앱 엔트리포인트 ──────────────────────────────────────────
-// 텔레그램 webhook 과 iPhone 단축어 직접 호출 양쪽을 모두 처리
 
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     var text = '';
 
-    // 텔레그램 webhook 형식: {message: {text: "..."}}
     if (body.message && body.message.text) {
       text = body.message.text.trim();
-    }
-    // 단축어 직접 호출 형식: {text: "..."}
-    else if (body.text) {
+    } else if (body.text) {
       text = body.text.trim();
     }
 
     if (!text) return jsonResponse({ ok: false, error: 'no text' });
 
+    // 1. 원본 문자 텔레그램에 전송
+    sendTelegram('📨 문자 수신\n' + text);
+
+    // 2. 파싱
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var parsed = parseCardMessage(text);
 
@@ -85,16 +87,18 @@ function doPost(e) {
       return jsonResponse({ ok: false, error: 'parse failed' });
     }
 
+    // 3. 시트 기록
     var classification = classifyExpense(parsed);
     var monthSheet = getMonthSheet(ss, parsed.date);
 
     if (!monthSheet) {
-      sendTelegram('❌ "' + (parsed.date.getMonth() + 1) + '월" 시트가 없습니다.\n시트를 먼저 만들어주세요.');
+      sendTelegram('❌ "' + (parsed.date.getMonth() + 1) + '월" 시트가 없습니다.');
       return jsonResponse({ ok: false, error: 'no sheet' });
     }
 
     writeRecord(monthSheet, parsed, classification);
 
+    // 4. 결과 텔레그램에 전송
     var typeLabel = classification.type === 'joint'
       ? '공동'
       : '개인(' + (classification.owner === 'incheon' ? '인천' : '가은') + ')';
