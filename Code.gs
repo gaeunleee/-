@@ -1,26 +1,6 @@
-/**
- * 카카오톡 카드 승인 문자 자동 파싱 - Google Apps Script
- *
- * [흐름]
- *   iPhone 문자 수신
- *     → 단축어(자동화)가 doPost 호출
- *     → 텔레그램에 원본 문자 전송
- *     → 파싱 → 시트 기록
- *     → 텔레그램에 결과 전송
- *
- * [시트 구조]
- *   인천 지출: A(날짜) B(금액) C(카테고리) D(가맹점) F(카드)
- *   가은 지출: H(날짜) I(금액) J(카테고리) K(가맹점) M(카드)
- *   공동 지출: O(날짜) P(금액) Q(카테고리) R(가맹점) T(지불방법)
- */
-
-// ── 설정 ───────────────────────────────────────────────────────
-
 var SPREADSHEET_ID   = '1HDhrERTUA8R6lTulXVLBltODbqwYYKETQ7Jd5r40WxU';
 var TELEGRAM_TOKEN   = '8787345424:AAFhcvWfNKyoNdNYgfoOyUJZROIPcsseogI';
 var TELEGRAM_CHAT_ID = 8727551535;
-
-// ── 상수 ──────────────────────────────────────────────────────
 
 var DATA_START_ROW = 2;
 
@@ -60,7 +40,16 @@ var NON_MERCHANT_PATTERNS = [
 
 var DATE_FORMAT = 'm"월" d"일"';
 
-// ── 웹앱 엔트리포인트 ──────────────────────────────────────────
+function doGet(e) {
+  var url = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage';
+  var res = UrlFetchApp.fetch(url, {
+    method: 'POST',
+    contentType: 'application/json',
+    payload: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: '테스트 메시지' }),
+    muteHttpExceptions: true
+  });
+  return ContentService.createTextOutput(res.getContentText());
+}
 
 function doPost(e) {
   try {
@@ -75,10 +64,8 @@ function doPost(e) {
 
     if (!text) return jsonResponse({ ok: false, error: 'no text' });
 
-    // 1. 원본 문자 텔레그램에 전송
     sendTelegram('📨 문자 수신\n' + text);
 
-    // 2. 파싱
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var parsed = parseCardMessage(text);
 
@@ -87,7 +74,6 @@ function doPost(e) {
       return jsonResponse({ ok: false, error: 'parse failed' });
     }
 
-    // 3. 시트 기록
     var classification = classifyExpense(parsed);
     var monthSheet = getMonthSheet(ss, parsed.date);
 
@@ -98,7 +84,6 @@ function doPost(e) {
 
     writeRecord(monthSheet, parsed, classification);
 
-    // 4. 결과 텔레그램에 전송
     var typeLabel = classification.type === 'joint'
       ? '공동'
       : '개인(' + (classification.owner === 'incheon' ? '인천' : '가은') + ')';
@@ -118,7 +103,7 @@ function doPost(e) {
 }
 
 function sendTelegram(text) {
-  UrlFetchApp.fetch(
+  var res = UrlFetchApp.fetch(
     'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage',
     {
       method: 'POST',
@@ -127,6 +112,7 @@ function sendTelegram(text) {
       muteHttpExceptions: true
     }
   );
+  Logger.log('Telegram response: ' + res.getContentText());
 }
 
 function jsonResponse(obj) {
@@ -134,8 +120,6 @@ function jsonResponse(obj) {
     .createTextOutput(JSON.stringify(obj))
     .setMimeType(ContentService.MimeType.JSON);
 }
-
-// ── 스프레드시트 열릴 때 커스텀 메뉴 등록 ─────────────────────
 
 function onOpen() {
   SpreadsheetApp.getUi()
@@ -145,89 +129,48 @@ function onOpen() {
     .addToUi();
 }
 
-// ── onEdit 트리거 ──────────────────────────────────────────────
-
 function onEdit(e) {
   try {
     var sheet = e.source.getActiveSheet();
     if (sheet.getName() !== '입력') return;
-
     var range = e.range;
     if (range.getRow() !== 1 || range.getColumn() !== 1) return;
-
     var message = range.getValue().toString().trim();
     if (!message) return;
-
     processMessage_(message, e.source, sheet);
   } catch (err) {
     try {
       var inputSheet = e.source.getSheetByName('입력');
       if (inputSheet) inputSheet.getRange(1, 2).setValue('❌ 오류: ' + err.toString());
     } catch (e2) {}
-    Logger.log('onEdit 오류: ' + err.toString());
   }
 }
-
-// ── 메뉴에서 수동 실행 ─────────────────────────────────────────
 
 function manualProcess() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   var inputSheet = ss.getSheetByName('입력');
-  if (!inputSheet) {
-    SpreadsheetApp.getUi().alert('"입력" 시트를 찾을 수 없습니다.');
-    return;
-  }
-
+  if (!inputSheet) { SpreadsheetApp.getUi().alert('"입력" 시트를 찾을 수 없습니다.'); return; }
   var message = inputSheet.getRange(1, 1).getValue().toString().trim();
-  if (!message) {
-    SpreadsheetApp.getUi().alert('A1이 비어있습니다. 카드 승인 문자를 붙여넣으세요.');
-    return;
-  }
-
+  if (!message) { SpreadsheetApp.getUi().alert('A1이 비어있습니다.'); return; }
   processMessage_(message, ss, inputSheet);
 }
 
-// ── 공통 처리 로직 ─────────────────────────────────────────────
-
 function processMessage_(message, ss, inputSheet) {
   var statusCell = inputSheet.getRange(1, 2);
-
   var parsed = parseCardMessage(message);
-  if (!parsed) {
-    statusCell.setValue('❌ 파싱 실패 - 문자 형식을 확인하세요');
-    return;
-  }
-
+  if (!parsed) { statusCell.setValue('❌ 파싱 실패'); return; }
   var classification = classifyExpense(parsed);
   var monthSheet = getMonthSheet(ss, parsed.date);
-  if (!monthSheet) {
-    statusCell.setValue('❌ "' + (parsed.date.getMonth() + 1) + '월" 시트 없음');
-    return;
-  }
-
+  if (!monthSheet) { statusCell.setValue('❌ "' + (parsed.date.getMonth() + 1) + '월" 시트 없음'); return; }
   writeRecord(monthSheet, parsed, classification);
-
   inputSheet.getRange(1, 1).setValue('');
   var typeLabel = classification.type === 'joint' ? '공동' : '개인(' + (classification.owner === 'incheon' ? '인천' : '가은') + ')';
-  statusCell.setValue(
-    '✅ ' + formatDate(parsed.date) + ' | ' +
-    parsed.merchant + ' | ' +
-    parsed.amount.toLocaleString() + '원 | ' +
-    classification.category + ' | ' + typeLabel
-  );
+  statusCell.setValue('✅ ' + formatDate(parsed.date) + ' | ' + parsed.merchant + ' | ' + parsed.amount.toLocaleString() + '원 | ' + classification.category + ' | ' + typeLabel);
 }
-
-// ── 메시지 파싱 ────────────────────────────────────────────────
 
 function parseCardMessage(msg) {
   var lines = msg.split('\n').map(function(l) { return l.trim(); }).filter(function(l) { return l.length > 0; });
-
-  var card = '';
-  var cardOwner = '';
-  var date = null;
-  var time = null;
-  var amount = 0;
-  var merchant = '';
+  var card = '', cardOwner = '', date = null, time = null, amount = 0, merchant = '';
   var usedIndices = {};
 
   for (var li = 0; li < lines.length; li++) {
@@ -244,61 +187,24 @@ function parseCardMessage(msg) {
   for (var i = 0; i < lines.length; i++) {
     var line = lines[i];
     var m;
-
     m = line.match(/(\d{1,2})\/(\d{1,2})(?:\([가-힣일월화수목금토]\))?\s+(\d{2}):(\d{2})/);
-    if (m) {
-      date = makeDate(null, parseInt(m[1]), parseInt(m[2]));
-      time = { hour: parseInt(m[3]), min: parseInt(m[4]) };
-      usedIndices[i] = true;
-      break;
-    }
-
+    if (m) { date = makeDate(null, parseInt(m[1]), parseInt(m[2])); time = { hour: parseInt(m[3]), min: parseInt(m[4]) }; usedIndices[i] = true; break; }
     m = line.match(/(\d{4})[.\-](\d{2})[.\-](\d{2})\s+(\d{2}):(\d{2})/);
-    if (m) {
-      date = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3]));
-      time = { hour: parseInt(m[4]), min: parseInt(m[5]) };
-      usedIndices[i] = true;
-      break;
-    }
-
+    if (m) { date = new Date(parseInt(m[1]), parseInt(m[2]) - 1, parseInt(m[3])); time = { hour: parseInt(m[4]), min: parseInt(m[5]) }; usedIndices[i] = true; break; }
     m = line.match(/^(\d{1,2})일\s+(\d{2}):(\d{2})$/);
-    if (m) {
-      var now = new Date();
-      date = new Date(now.getFullYear(), now.getMonth(), parseInt(m[1]));
-      time = { hour: parseInt(m[2]), min: parseInt(m[3]) };
-      usedIndices[i] = true;
-      break;
-    }
-
+    if (m) { var now = new Date(); date = new Date(now.getFullYear(), now.getMonth(), parseInt(m[1])); time = { hour: parseInt(m[2]), min: parseInt(m[3]) }; usedIndices[i] = true; break; }
     m = line.match(/(\d{1,2})일(\d{2}):(\d{2})/);
-    if (m) {
-      var now2 = new Date();
-      date = new Date(now2.getFullYear(), now2.getMonth(), parseInt(m[1]));
-      time = { hour: parseInt(m[2]), min: parseInt(m[3]) };
-      usedIndices[i] = true;
-      break;
-    }
-
+    if (m) { var now2 = new Date(); date = new Date(now2.getFullYear(), now2.getMonth(), parseInt(m[1])); time = { hour: parseInt(m[2]), min: parseInt(m[3]) }; usedIndices[i] = true; break; }
     m = line.match(/^(\d{1,2})\/(\d{1,2})(?:\([가-힣일월화수목금토]\))?$/);
     if (m && i + 1 < lines.length) {
       var tm = lines[i + 1].match(/^(\d{2}):(\d{2})/);
-      if (tm) {
-        date = makeDate(null, parseInt(m[1]), parseInt(m[2]));
-        time = { hour: parseInt(tm[1]), min: parseInt(tm[2]) };
-        usedIndices[i] = true;
-        usedIndices[i + 1] = true;
-        break;
-      }
+      if (tm) { date = makeDate(null, parseInt(m[1]), parseInt(m[2])); time = { hour: parseInt(tm[1]), min: parseInt(tm[2]) }; usedIndices[i] = true; usedIndices[i + 1] = true; break; }
     }
   }
 
   for (var j = 0; j < lines.length; j++) {
     var am = lines[j].match(/([\d,]+)\s*원/);
-    if (am) {
-      amount = parseInt(am[1].replace(/,/g, ''));
-      usedIndices[j] = true;
-      break;
-    }
+    if (am) { amount = parseInt(am[1].replace(/,/g, '')); usedIndices[j] = true; break; }
   }
 
   for (var k = 0; k < lines.length; k++) {
@@ -309,16 +215,11 @@ function parseCardMessage(msg) {
       if (NON_MERCHANT_PATTERNS[pi].test(ln)) { skip = true; break; }
     }
     if (skip || ln.length < 2) continue;
-
     merchant = cleanMerchantName(ln.replace(/^가맹점명?\s*[:：]\s*/, '').trim());
     break;
   }
 
-  if (!date || !merchant || amount <= 0) {
-    Logger.log('불완전 파싱 - date:' + date + ', merchant:"' + merchant + '", amount:' + amount);
-    return null;
-  }
-
+  if (!date || !merchant || amount <= 0) return null;
   return { date: date, time: time, amount: amount, merchant: merchant, card: card, cardOwner: cardOwner };
 }
 
@@ -327,43 +228,23 @@ function makeDate(year, month, day) {
 }
 
 function cleanMerchantName(name) {
-  return name
-    .replace(/\s*\d+호점$/, '')
-    .replace(/\s*\d+점$/, '')
-    .replace(/\s*점\d+호$/, '')
-    .replace(/\s*점$/, '')
-    .trim();
+  return name.replace(/\s*\d+호점$/, '').replace(/\s*\d+점$/, '').replace(/\s*점\d+호$/, '').replace(/\s*점$/, '').trim();
 }
 
-// ── 지출 분류 ──────────────────────────────────────────────────
-
 function classifyExpense(parsed) {
-  var date      = parsed.date;
-  var time      = parsed.time;
-  var merchant  = parsed.merchant;
-  var card      = parsed.card;
-  var cardOwner = parsed.cardOwner;
-
+  var date = parsed.date, time = parsed.time, merchant = parsed.merchant, card = parsed.card, cardOwner = parsed.cardOwner;
   for (var ji = 0; ji < JOINT_MERCHANTS.length; ji++) {
-    if (merchant.indexOf(JOINT_MERCHANTS[ji]) !== -1)
-      return { type: 'joint', category: '생활비', payMethod: card };
+    if (merchant.indexOf(JOINT_MERCHANTS[ji]) !== -1) return { type: 'joint', category: '생활비', payMethod: card };
   }
-
   for (var pi = 0; pi < PERSONAL_MERCHANTS.length; pi++) {
-    if (merchant.indexOf(PERSONAL_MERCHANTS[pi]) !== -1)
-      return { type: 'personal', category: determineCategory(merchant), owner: cardOwner };
+    if (merchant.indexOf(PERSONAL_MERCHANTS[pi]) !== -1) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner };
   }
-
   var dow = date.getDay();
-  if (dow === 0 || dow === 6)
-    return { type: 'joint', category: determineCategory(merchant), payMethod: card };
-
+  if (dow === 0 || dow === 6) return { type: 'joint', category: determineCategory(merchant), payMethod: card };
   if (time) {
     var totalMin = time.hour * 60 + time.min;
-    if (totalMin >= 8 * 60 && totalMin <= 18 * 60 + 30)
-      return { type: 'personal', category: determineCategory(merchant), owner: cardOwner };
+    if (totalMin >= 8 * 60 && totalMin <= 18 * 60 + 30) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner };
   }
-
   return { type: 'joint', category: determineCategory(merchant), payMethod: card };
 }
 
@@ -378,24 +259,13 @@ function determineCategory(merchant) {
   return '외식';
 }
 
-// ── 시트 조회 ──────────────────────────────────────────────────
-
 function getMonthSheet(ss, date) {
   return ss.getSheetByName((date.getMonth() + 1) + '월');
 }
 
-// ── 시트 기록 ──────────────────────────────────────────────────
-
 function writeRecord(sheet, parsed, classification) {
-  var date      = parsed.date;
-  var amount    = parsed.amount;
-  var merchant  = parsed.merchant;
-  var card      = parsed.card;
-  var type      = classification.type;
-  var category  = classification.category;
-  var payMethod = classification.payMethod;
-  var owner     = classification.owner;
-
+  var date = parsed.date, amount = parsed.amount, merchant = parsed.merchant, card = parsed.card;
+  var type = classification.type, category = classification.category, payMethod = classification.payMethod, owner = classification.owner;
   if (type === 'joint') {
     var row = getNextEmptyRow(sheet, 15);
     sheet.getRange(row, 15).setValue(date).setNumberFormat(DATE_FORMAT);
@@ -403,7 +273,6 @@ function writeRecord(sheet, parsed, classification) {
     sheet.getRange(row, 17).setValue(category);
     sheet.getRange(row, 18).setValue(merchant);
     sheet.getRange(row, 20).setValue(payMethod || card);
-
   } else if (owner === 'incheon') {
     var row = getNextEmptyRow(sheet, 1);
     sheet.getRange(row, 1).setValue(date).setNumberFormat(DATE_FORMAT);
@@ -411,7 +280,6 @@ function writeRecord(sheet, parsed, classification) {
     sheet.getRange(row, 3).setValue(category);
     sheet.getRange(row, 4).setValue(merchant);
     sheet.getRange(row, 6).setValue(card);
-
   } else if (owner === 'gaeun') {
     var row = getNextEmptyRow(sheet, 8);
     sheet.getRange(row, 8).setValue(date).setNumberFormat(DATE_FORMAT);
@@ -425,7 +293,6 @@ function writeRecord(sheet, parsed, classification) {
 function getNextEmptyRow(sheet, col) {
   var lastRow = sheet.getLastRow();
   if (lastRow < DATA_START_ROW) return DATA_START_ROW;
-
   var values = sheet.getRange(DATA_START_ROW, col, lastRow - DATA_START_ROW + 1).getValues();
   for (var i = values.length - 1; i >= 0; i--) {
     if (values[i][0] !== '' && values[i][0] !== null) return DATA_START_ROW + i + 1;
@@ -435,37 +302,4 @@ function getNextEmptyRow(sheet, col) {
 
 function formatDate(date) {
   return (date.getMonth() + 1) + '월 ' + date.getDate() + '일';
-}
-
-// ── 수동 테스트 ────────────────────────────────────────────────
-
-function testParse() {
-  var testCases = [
-    { label: '인천 로카 / 주말 / 지엠마트 → 공동 생활비',
-      msg: '[Web발신]\n롯데카드(LIKIT)\n04/19(토) 14:30\n지엠마트연수점\n45,000원 승인\n일시불' },
-    { label: '가은 로카 / 평일 업무시간 / 버스 → 가은 개인 교통비',
-      msg: '[Web발신]\n롯데카드(365)\n04/18(금) 09:15\n버스요금\n1,300원 승인' },
-    { label: '인천 로카 / 평일 점심 / 스타벅스 → 인천 개인 여가',
-      msg: '[Web발신]롯데카드(LIKIT)\n04/17(목) 12:00\n스타벅스코리아\n6,500원 승인\n일시불' },
-    { label: '인천 로카 / 평일 저녁 / 식당 → 공동 외식',
-      msg: '[Web발신]\n롯데카드(LIKIT)\n04/17(목) 19:30\n홍콩반점0410\n28,000원 승인\n일시불' },
-    { label: '인천 로카 / 올리브영 → 인천 개인',
-      msg: '[Web발신]\n롯데카드(LIKIT)\n04/16(수) 15:00\n올리브영인천점\n32,500원 승인' },
-  ];
-
-  var dow = ['일', '월', '화', '수', '목', '금', '토'];
-  for (var i = 0; i < testCases.length; i++) {
-    var tc = testCases[i];
-    Logger.log('══ 테스트 ' + (i + 1) + ': ' + tc.label);
-    var parsed = parseCardMessage(tc.msg);
-    if (!parsed) { Logger.log('  ❌ 파싱 실패\n'); continue; }
-    var cl = classifyExpense(parsed);
-    Logger.log('  가맹점  : ' + parsed.merchant);
-    Logger.log('  금액    : ' + parsed.amount.toLocaleString() + '원');
-    Logger.log('  날짜    : ' + formatDate(parsed.date) + ' (' + dow[parsed.date.getDay()] + ')');
-    Logger.log('  시간    : ' + (parsed.time ? parsed.time.hour + ':' + String(parsed.time.min).padStart(2, '0') : '미상'));
-    Logger.log('  카드    : ' + parsed.card + ' (' + parsed.cardOwner + ')');
-    Logger.log('  분류    : ' + (cl.type === 'joint' ? '공동' : '개인') + ' / ' + cl.category);
-    Logger.log('');
-  }
 }
