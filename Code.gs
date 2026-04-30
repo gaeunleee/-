@@ -1,6 +1,6 @@
 var SPREADSHEET_ID   = '1HDhrERTUA8R6lTulXVLBltODbqwYYKETQ7Jd5r40WxU';
 var TELEGRAM_TOKEN   = '8787345424:AAFhcvWfNKyoNdNYgfoOyUJZROIPcsseogI';
-var TELEGRAM_CHAT_ID = 8727551535;
+var TELEGRAM_CHAT_ID = 8727551535; // iPhone 단축어용 고정 ID
 
 var DATA_START_ROW = 2;
 
@@ -40,37 +40,37 @@ var NON_MERCHANT_PATTERNS = [
 
 var DATE_FORMAT = 'm"월" d"일"';
 
-function doGet(e) {
-  var url = 'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage';
-  var res = UrlFetchApp.fetch(url, {
-    method: 'POST',
-    contentType: 'application/json',
-    payload: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: '테스트 메시지' }),
-    muteHttpExceptions: true
-  });
-  return ContentService.createTextOutput(res.getContentText());
-}
-
 function doPost(e) {
   try {
     var body = JSON.parse(e.postData.contents);
     var text = '';
+    var chatId = TELEGRAM_CHAT_ID;
 
-    if (body.message && body.message.text) {
-      text = body.message.text.trim();
-    } else if (body.text) {
+    // 텔레그램 webhook: 수신 chat.id로 응답
+    if (body.message && body.message.chat && body.message.chat.id) {
+      chatId = body.message.chat.id;
+      text = (body.message.text || '').trim();
+
+      // /chatid 명령어: 현재 chat ID 알려주기
+      if (text === '/chatid' || text === '/start') {
+        sendTo(chatId, '내 채팅 ID: ' + chatId);
+        return jsonResponse({ ok: true });
+      }
+    }
+    // iPhone 단축어 직접 호출
+    else if (body.text) {
       text = body.text.trim();
     }
 
     if (!text) return jsonResponse({ ok: false, error: 'no text' });
 
-    sendTelegram('📨 문자 수신\n' + text);
+    sendTo(chatId, '📨 문자 수신\n' + text);
 
     var ss = SpreadsheetApp.openById(SPREADSHEET_ID);
     var parsed = parseCardMessage(text);
 
     if (!parsed) {
-      sendTelegram('❌ 파싱 실패\n카드 승인 문자 형식이 아닙니다.');
+      sendTo(chatId, '❌ 파싱 실패\n카드 승인 문자 형식이 아닙니다.');
       return jsonResponse({ ok: false, error: 'parse failed' });
     }
 
@@ -78,7 +78,7 @@ function doPost(e) {
     var monthSheet = getMonthSheet(ss, parsed.date);
 
     if (!monthSheet) {
-      sendTelegram('❌ "' + (parsed.date.getMonth() + 1) + '월" 시트가 없습니다.');
+      sendTo(chatId, '❌ "' + (parsed.date.getMonth() + 1) + '월" 시트가 없습니다.');
       return jsonResponse({ ok: false, error: 'no sheet' });
     }
 
@@ -88,7 +88,7 @@ function doPost(e) {
       ? '공동'
       : '개인(' + (classification.owner === 'incheon' ? '인천' : '가은') + ')';
 
-    sendTelegram(
+    sendTo(chatId,
       '✅ 기록 완료\n' +
       formatDate(parsed.date) + ' | ' + parsed.merchant + '\n' +
       parsed.amount.toLocaleString() + '원 | ' + classification.category + ' | ' + typeLabel
@@ -97,36 +97,28 @@ function doPost(e) {
     return jsonResponse({ ok: true });
 
   } catch (err) {
-    try { sendTelegram('❌ 오류: ' + err.toString()); } catch (e2) {}
     return jsonResponse({ ok: false, error: err.toString() });
   }
 }
 
-function sendTelegram(text) {
-  var res = UrlFetchApp.fetch(
+function sendTo(chatId, text) {
+  UrlFetchApp.fetch(
     'https://api.telegram.org/bot' + TELEGRAM_TOKEN + '/sendMessage',
     {
       method: 'POST',
       contentType: 'application/json',
-      payload: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: text }),
+      payload: JSON.stringify({ chat_id: chatId, text: text }),
       muteHttpExceptions: true
     }
   );
-  Logger.log('Telegram response: ' + res.getContentText());
 }
 
 function jsonResponse(obj) {
-  return ContentService
-    .createTextOutput(JSON.stringify(obj))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
 }
 
 function onOpen() {
-  SpreadsheetApp.getUi()
-    .createMenu('💳 가계부')
-    .addItem('A1 문자 지금 처리', 'manualProcess')
-    .addItem('테스트 실행 (로그 확인)', 'testParse')
-    .addToUi();
+  SpreadsheetApp.getUi().createMenu('💳 가계부').addItem('A1 문자 지금 처리', 'manualProcess').addToUi();
 }
 
 function onEdit(e) {
@@ -138,12 +130,7 @@ function onEdit(e) {
     var message = range.getValue().toString().trim();
     if (!message) return;
     processMessage_(message, e.source, sheet);
-  } catch (err) {
-    try {
-      var inputSheet = e.source.getSheetByName('입력');
-      if (inputSheet) inputSheet.getRange(1, 2).setValue('❌ 오류: ' + err.toString());
-    } catch (e2) {}
-  }
+  } catch (err) {}
 }
 
 function manualProcess() {
@@ -175,18 +162,13 @@ function parseCardMessage(msg) {
 
   for (var li = 0; li < lines.length; li++) {
     for (var ci = 0; ci < CARD_PATTERNS.length; ci++) {
-      if (CARD_PATTERNS[ci].pattern.test(lines[li])) {
-        card = CARD_PATTERNS[ci].card;
-        cardOwner = CARD_PATTERNS[ci].owner;
-        break;
-      }
+      if (CARD_PATTERNS[ci].pattern.test(lines[li])) { card = CARD_PATTERNS[ci].card; cardOwner = CARD_PATTERNS[ci].owner; break; }
     }
     if (card) break;
   }
 
   for (var i = 0; i < lines.length; i++) {
-    var line = lines[i];
-    var m;
+    var line = lines[i], m;
     m = line.match(/(\d{1,2})\/(\d{1,2})(?:\([가-힣일월화수목금토]\))?\s+(\d{2}):(\d{2})/);
     if (m) { date = makeDate(null, parseInt(m[1]), parseInt(m[2])); time = { hour: parseInt(m[3]), min: parseInt(m[4]) }; usedIndices[i] = true; break; }
     m = line.match(/(\d{4})[.\-](\d{2})[.\-](\d{2})\s+(\d{2}):(\d{2})/);
@@ -209,11 +191,8 @@ function parseCardMessage(msg) {
 
   for (var k = 0; k < lines.length; k++) {
     if (usedIndices[k]) continue;
-    var ln = lines[k];
-    var skip = false;
-    for (var pi = 0; pi < NON_MERCHANT_PATTERNS.length; pi++) {
-      if (NON_MERCHANT_PATTERNS[pi].test(ln)) { skip = true; break; }
-    }
+    var ln = lines[k], skip = false;
+    for (var pi = 0; pi < NON_MERCHANT_PATTERNS.length; pi++) { if (NON_MERCHANT_PATTERNS[pi].test(ln)) { skip = true; break; } }
     if (skip || ln.length < 2) continue;
     merchant = cleanMerchantName(ln.replace(/^가맹점명?\s*[:：]\s*/, '').trim());
     break;
@@ -223,9 +202,7 @@ function parseCardMessage(msg) {
   return { date: date, time: time, amount: amount, merchant: merchant, card: card, cardOwner: cardOwner };
 }
 
-function makeDate(year, month, day) {
-  return new Date(year || new Date().getFullYear(), month - 1, day);
-}
+function makeDate(year, month, day) { return new Date(year || new Date().getFullYear(), month - 1, day); }
 
 function cleanMerchantName(name) {
   return name.replace(/\s*\d+호점$/, '').replace(/\s*\d+점$/, '').replace(/\s*점\d+호$/, '').replace(/\s*점$/, '').trim();
@@ -233,35 +210,21 @@ function cleanMerchantName(name) {
 
 function classifyExpense(parsed) {
   var date = parsed.date, time = parsed.time, merchant = parsed.merchant, card = parsed.card, cardOwner = parsed.cardOwner;
-  for (var ji = 0; ji < JOINT_MERCHANTS.length; ji++) {
-    if (merchant.indexOf(JOINT_MERCHANTS[ji]) !== -1) return { type: 'joint', category: '생활비', payMethod: card };
-  }
-  for (var pi = 0; pi < PERSONAL_MERCHANTS.length; pi++) {
-    if (merchant.indexOf(PERSONAL_MERCHANTS[pi]) !== -1) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner };
-  }
+  for (var ji = 0; ji < JOINT_MERCHANTS.length; ji++) { if (merchant.indexOf(JOINT_MERCHANTS[ji]) !== -1) return { type: 'joint', category: '생활비', payMethod: card }; }
+  for (var pi = 0; pi < PERSONAL_MERCHANTS.length; pi++) { if (merchant.indexOf(PERSONAL_MERCHANTS[pi]) !== -1) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner }; }
   var dow = date.getDay();
   if (dow === 0 || dow === 6) return { type: 'joint', category: determineCategory(merchant), payMethod: card };
-  if (time) {
-    var totalMin = time.hour * 60 + time.min;
-    if (totalMin >= 8 * 60 && totalMin <= 18 * 60 + 30) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner };
-  }
+  if (time) { var totalMin = time.hour * 60 + time.min; if (totalMin >= 8 * 60 && totalMin <= 18 * 60 + 30) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner }; }
   return { type: 'joint', category: determineCategory(merchant), payMethod: card };
 }
 
 function determineCategory(merchant) {
   var cats = Object.keys(CATEGORY_KEYWORDS);
-  for (var ci = 0; ci < cats.length; ci++) {
-    var keywords = CATEGORY_KEYWORDS[cats[ci]];
-    for (var ki = 0; ki < keywords.length; ki++) {
-      if (merchant.indexOf(keywords[ki]) !== -1) return cats[ci];
-    }
-  }
+  for (var ci = 0; ci < cats.length; ci++) { var keywords = CATEGORY_KEYWORDS[cats[ci]]; for (var ki = 0; ki < keywords.length; ki++) { if (merchant.indexOf(keywords[ki]) !== -1) return cats[ci]; } }
   return '외식';
 }
 
-function getMonthSheet(ss, date) {
-  return ss.getSheetByName((date.getMonth() + 1) + '월');
-}
+function getMonthSheet(ss, date) { return ss.getSheetByName((date.getMonth() + 1) + '월'); }
 
 function writeRecord(sheet, parsed, classification) {
   var date = parsed.date, amount = parsed.amount, merchant = parsed.merchant, card = parsed.card;
@@ -269,24 +232,18 @@ function writeRecord(sheet, parsed, classification) {
   if (type === 'joint') {
     var row = getNextEmptyRow(sheet, 15);
     sheet.getRange(row, 15).setValue(date).setNumberFormat(DATE_FORMAT);
-    sheet.getRange(row, 16).setValue(amount);
-    sheet.getRange(row, 17).setValue(category);
-    sheet.getRange(row, 18).setValue(merchant);
-    sheet.getRange(row, 20).setValue(payMethod || card);
+    sheet.getRange(row, 16).setValue(amount); sheet.getRange(row, 17).setValue(category);
+    sheet.getRange(row, 18).setValue(merchant); sheet.getRange(row, 20).setValue(payMethod || card);
   } else if (owner === 'incheon') {
     var row = getNextEmptyRow(sheet, 1);
     sheet.getRange(row, 1).setValue(date).setNumberFormat(DATE_FORMAT);
-    sheet.getRange(row, 2).setValue(amount);
-    sheet.getRange(row, 3).setValue(category);
-    sheet.getRange(row, 4).setValue(merchant);
-    sheet.getRange(row, 6).setValue(card);
+    sheet.getRange(row, 2).setValue(amount); sheet.getRange(row, 3).setValue(category);
+    sheet.getRange(row, 4).setValue(merchant); sheet.getRange(row, 6).setValue(card);
   } else if (owner === 'gaeun') {
     var row = getNextEmptyRow(sheet, 8);
     sheet.getRange(row, 8).setValue(date).setNumberFormat(DATE_FORMAT);
-    sheet.getRange(row, 9).setValue(amount);
-    sheet.getRange(row, 10).setValue(category);
-    sheet.getRange(row, 11).setValue(merchant);
-    sheet.getRange(row, 13).setValue(card);
+    sheet.getRange(row, 9).setValue(amount); sheet.getRange(row, 10).setValue(category);
+    sheet.getRange(row, 11).setValue(merchant); sheet.getRange(row, 13).setValue(card);
   }
 }
 
@@ -294,12 +251,8 @@ function getNextEmptyRow(sheet, col) {
   var lastRow = sheet.getLastRow();
   if (lastRow < DATA_START_ROW) return DATA_START_ROW;
   var values = sheet.getRange(DATA_START_ROW, col, lastRow - DATA_START_ROW + 1).getValues();
-  for (var i = values.length - 1; i >= 0; i--) {
-    if (values[i][0] !== '' && values[i][0] !== null) return DATA_START_ROW + i + 1;
-  }
+  for (var i = values.length - 1; i >= 0; i--) { if (values[i][0] !== '' && values[i][0] !== null) return DATA_START_ROW + i + 1; }
   return DATA_START_ROW;
 }
 
-function formatDate(date) {
-  return (date.getMonth() + 1) + '월 ' + date.getDate() + '일';
-}
+function formatDate(date) { return (date.getMonth() + 1) + '월 ' + date.getDate() + '일'; }
