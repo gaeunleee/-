@@ -15,7 +15,7 @@
 // ── 설정 ───────────────────────────────────────────────────────
 
 var SPREADSHEET_ID   = '1HDhrERTUA8R6lTulXVLBltODbqwYYKETQ7Jd5r40WxU';
-var TELEGRAM_TOKEN   = 'YOUR_BOT_TOKEN';   // BotFather에서 받은 봇 토큰으로 교체
+var TELEGRAM_TOKEN   = '8787345424:AAFhcvWfNKyoNdNYgfoOyUJZROIPcsseogI';
 var TELEGRAM_CHAT_ID = 8727551535;
 
 // ── 상수 ──────────────────────────────────────────────────────
@@ -34,10 +34,10 @@ var CATEGORY_KEYWORDS = {
 };
 
 var CARD_PATTERNS = [
-  { pattern: /LIKIT/i,                 card: '인천 로카', owner: 'incheon' },
-  { pattern: /\b365\b/,               card: '가은 로카', owner: 'gaeun'   },
-  { pattern: /삼성카드|삼성페이/,     card: '인천 삼성', owner: 'incheon' },
-  { pattern: /국민카드|KB카드|KB국민/, card: '인천 국민', owner: 'incheon' },
+  { pattern: /LIKIT/i,                  card: '인천 로카', owner: 'incheon' },
+  { pattern: /\b365\b/,                 card: '가은 로카', owner: 'gaeun'   },
+  { pattern: /삼성카드|삼성페이/,       card: '인천 삼성', owner: 'incheon' },
+  { pattern: /국민카드|KB카드|KB국민/,  card: '인천 국민', owner: 'incheon' },
 ];
 
 var NON_MERCHANT_PATTERNS = [
