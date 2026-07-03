@@ -1,0 +1,41 @@
+name: 나라장터 입찰공고 자동 알림
+
+on:
+  schedule:
+    # 매 3시간마다 실행 (UTC 기준, 한국시간 기준 대략 3시간 간격)
+    - cron: "0 */3 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+jobs:
+  check-bids:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 저장소 체크아웃
+        uses: actions/checkout@v4
+
+      - name: Python 설치
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: 패키지 설치
+        run: pip install -r narajangteo-alert/requirements.txt
+
+      - name: 입찰공고 조회 및 알림 발송
+        env:
+          PPS_SERVICE_KEY: ${{ secrets.PPS_SERVICE_KEY }}
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+          ALERT_TO: ${{ secrets.ALERT_TO }}
+        run: python narajangteo-alert/bid_alert.py
+
+      - name: 알림 이력 파일 저장
+        run: |
+          git config user.name "bid-alert-bot"
+          git config user.email "actions@github.com"
+          git add narajangteo-alert/seen_bids.json
+          git diff --cached --quiet || git commit -m "chore: 알림 이력 갱신"
+          git push
