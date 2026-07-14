@@ -17,7 +17,9 @@ var CATEGORY_KEYWORDS = {
 
 var CARD_PATTERNS = [
   { pattern: /LIKIT/i,                  card: '인천 로카', owner: 'incheon' },
-  { pattern: /\b365\b/,                 card: '가은 로카', owner: 'gaeun'   },
+  { pattern: /\b365\b/,                card: '가은 로카', owner: 'gaeun'   },
+  { pattern: /3\*3\*|\b3\d3\d\b/,     card: '인천 로카', owner: 'incheon' },
+  { pattern: /7\*4\*|\b7\d4\d\b/,     card: '가은 로카', owner: 'gaeun'   },
   { pattern: /삼성카드|삼성페이/,       card: '인천 삼성', owner: 'incheon' },
   { pattern: /국민카드|KB카드|KB국민/,  card: '인천 국민', owner: 'incheon' },
 ];
@@ -46,19 +48,14 @@ function doPost(e) {
     var text = '';
     var chatId = TELEGRAM_CHAT_ID;
 
-    // 텔레그램 webhook: 수신 chat.id로 응답
     if (body.message && body.message.chat && body.message.chat.id) {
       chatId = body.message.chat.id;
       text = (body.message.text || '').trim();
-
-      // /chatid 명령어: 현재 chat ID 알려주기
       if (text === '/chatid' || text === '/start') {
         sendTo(chatId, '내 채팅 ID: ' + chatId);
         return jsonResponse({ ok: true });
       }
-    }
-    // iPhone 단축어 직접 호출
-    else if (body.text) {
+    } else if (body.text) {
       text = body.text.trim();
     }
 
@@ -214,7 +211,7 @@ function classifyExpense(parsed) {
   for (var pi = 0; pi < PERSONAL_MERCHANTS.length; pi++) { if (merchant.indexOf(PERSONAL_MERCHANTS[pi]) !== -1) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner }; }
   var dow = date.getDay();
   if (dow === 0 || dow === 6) return { type: 'joint', category: determineCategory(merchant), payMethod: card };
-  if (time) { var totalMin = time.hour * 60 + time.min; if (totalMin >= 8 * 60 && totalMin <= 18 * 60 + 30) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner }; }
+  if (time) { var totalMin = time.hour * 60 + time.min; if (totalMin >= 8 * 60 && totalMin <= 19 * 60) return { type: 'personal', category: determineCategory(merchant), owner: cardOwner }; }
   return { type: 'joint', category: determineCategory(merchant), payMethod: card };
 }
 
