@@ -18,7 +18,7 @@ export interface ApiCallOptions {
   label: string;
 }
 
-interface Envelope {
+export interface Envelope {
   resultCode: string;
   resultMsg: string;
   items: RawItem[];
@@ -53,24 +53,48 @@ function normalizeItems(itemsField: unknown): RawItem[] {
   return [];
 }
 
+/**
+ * 응답 트리 어딘가에서 resultCode/resultMsg를 가진 객체를 재귀적으로 찾는다.
+ * data.go.kr 표준 형식은 response.header 아래 있지만, 일부 오퍼레이션은
+ * `{"nkoneps.com.response.ResponseError": {...}}` 같은 비표준 오류 포맷을 내려주기도 해서
+ * 고정 경로(response.header)만 보면 실제 오류코드를 놓치고 기본값(99)으로 덮어써버린다.
+ */
+function findHeader(node: unknown, depth = 0): { resultCode: string; resultMsg: string } | null {
+  if (depth > 5 || node === null || typeof node !== "object") return null;
+  const obj = node as Record<string, unknown>;
+
+  if ("resultCode" in obj) {
+    return {
+      resultCode: String(obj.resultCode ?? "").trim(),
+      resultMsg: String(obj.resultMsg ?? "알 수 없는 응답 형식").trim(),
+    };
+  }
+
+  for (const value of Object.values(obj)) {
+    const found = findHeader(value, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}
+
 function extractEnvelope(parsed: unknown): Envelope {
   const root = parsed as Record<string, unknown>;
   const response = (root?.response ?? root) as Record<string, unknown> | undefined;
-  const header = (response?.header ?? {}) as Record<string, unknown>;
   const body = (response?.body ?? {}) as Record<string, unknown>;
 
-  const resultCode = String(header.resultCode ?? "").trim();
-  const resultMsg = String(header.resultMsg ?? "알 수 없는 응답 형식").trim();
+  const header = findHeader(root);
+  const resultCode = header?.resultCode || "99";
+  const resultMsg = header?.resultMsg ?? "알 수 없는 응답 형식";
 
   const items = normalizeItems(body.items);
   const totalCount = Number(body.totalCount ?? items.length) || 0;
   const pageNo = Number(body.pageNo ?? 1) || 1;
   const numOfRows = Number(body.numOfRows ?? items.length) || items.length;
 
-  return { resultCode: resultCode || "99", resultMsg, items, totalCount, pageNo, numOfRows };
+  return { resultCode, resultMsg, items, totalCount, pageNo, numOfRows };
 }
 
-function parseResponseBody(text: string, label: string): Envelope {
+export function parseResponseBody(text: string, label: string): Envelope {
   const trimmed = text.trim();
   if (trimmed.length === 0) {
     throw new ApiError(label, "빈 응답을 받았습니다");
@@ -118,7 +142,9 @@ async function callOnce(options: ApiCallOptions, extraParams: Record<string, str
     const envelope = parseResponseBody(text, options.label);
 
     if (!SUCCESS_RESULT_CODES.has(envelope.resultCode)) {
-      throw new ApiResultError(options.label, envelope.resultCode, describeResultCode(envelope.resultCode));
+      const description = describeResultCode(envelope.resultCode);
+      const detail = envelope.resultMsg && envelope.resultMsg !== description ? ` (원본 메시지: ${envelope.resultMsg})` : "";
+      throw new ApiResultError(options.label, envelope.resultCode, `${description}${detail}`);
     }
 
     return envelope;
