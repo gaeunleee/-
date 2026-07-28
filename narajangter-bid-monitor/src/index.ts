@@ -4,6 +4,7 @@ import { fetchBidNotices } from "./api/bidNoticeApi.js";
 import { fetchPreStandardNotices } from "./api/preStandardApi.js";
 import { lookbackWindow } from "./api/dateUtil.js";
 import { evaluateNotices } from "./matching/matchEngine.js";
+import { applyQualificationFilter } from "./matching/applyQualificationFilter.js";
 import { buildReport } from "./report/buildReport.js";
 import { saveReportToDisk } from "./report/saveReport.js";
 import { createTransporter, verifyTransporter } from "./email/mailer.js";
@@ -38,7 +39,7 @@ async function run(): Promise<number> {
       throw new ApiError("전체조회", "본공고/사전규격 조회가 모두 실패했습니다. API 키/네트워크 상태를 확인하세요.");
     }
 
-    const bidMatches = evaluateNotices(
+    const bidMatchesBeforeQualificationFilter = evaluateNotices(
       bidResults.flatMap((r) => r.notices),
       appConfig
     );
@@ -46,6 +47,10 @@ async function run(): Promise<number> {
       preStandardResults.flatMap((r) => r.notices),
       appConfig
     );
+
+    // 사전규격은 대응하는 면허제한 조회 API가 없어 자격조건 필터 대상이 아니다 (본공고만 적용).
+    logger.info("자격조건 필터 적용 시작", { 대상: bidMatchesBeforeQualificationFilter.length });
+    const bidMatches = await applyQualificationFilter(env, appConfig, bidMatchesBeforeQualificationFilter, window);
 
     const report = buildReport({
       generatedAt: now,

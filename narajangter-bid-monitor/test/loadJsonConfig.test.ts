@@ -5,7 +5,12 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ConfigError } from "../src/errors.js";
 import { _resetAppConfigCacheForTests, loadAppConfig } from "../src/config/loadJsonConfig.js";
 
-function writeConfigDir(files: { keywords?: unknown; codes?: unknown; recipients?: unknown }): string {
+function writeConfigDir(files: {
+  keywords?: unknown;
+  codes?: unknown;
+  recipients?: unknown;
+  heldQualifications?: unknown;
+}): string {
   const dir = mkdtempSync(path.join(tmpdir(), "narajangter-test-"));
   writeFileSync(path.join(dir, "keywords.json"), JSON.stringify(files.keywords ?? { keywords: ["도서관"] }));
   writeFileSync(
@@ -20,6 +25,15 @@ function writeConfigDir(files: { keywords?: unknown; codes?: unknown; recipients
   writeFileSync(
     path.join(dir, "recipients.json"),
     JSON.stringify(files.recipients ?? { recipients: ["a@example.com"] })
+  );
+  writeFileSync(
+    path.join(dir, "held-qualifications.json"),
+    JSON.stringify(
+      files.heldQualifications ?? {
+        heldProducts: [{ code: "1", name: "a" }],
+        heldIndustries: [{ code: "2", name: "b" }],
+      }
+    )
   );
   return dir;
 }
@@ -63,6 +77,19 @@ describe("loadAppConfig", () => {
           { code: "1", name: "dup" },
         ],
         industryCodes: [{ code: "2", name: "b" }],
+      },
+    });
+    expect(() => loadAppConfig()).toThrow(ConfigError);
+  });
+
+  it("held-qualifications.json에 중복된 코드가 있으면 ConfigError를 던진다", () => {
+    process.env.APP_CONFIG_DIR = writeConfigDir({
+      heldQualifications: {
+        heldProducts: [
+          { code: "1", name: "a" },
+          { code: "1", name: "dup" },
+        ],
+        heldIndustries: [{ code: "2", name: "b" }],
       },
     });
     expect(() => loadAppConfig()).toThrow(ConfigError);

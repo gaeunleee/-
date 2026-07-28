@@ -32,6 +32,23 @@ export const BID_NOTICE_FIELD_CANDIDATES: FieldCandidates = {
   productClsfcName: ["prdctClsfcNoNm"],
 };
 
+/** getBidPblancListInfoLicenseLimit (면허제한정보조회) 응답 필드 후보 */
+export interface LicenseLimitFieldCandidates {
+  noticeNo: string[];
+  groupNo: string[];
+  seqNo: string[];
+  licenseLimitName: string[];
+  allowedIndustryList: string[];
+}
+
+export const LICENSE_LIMIT_FIELD_CANDIDATES: LicenseLimitFieldCandidates = {
+  noticeNo: ["bidNtceNo"],
+  groupNo: ["rstrctGroupNo", "prtcptLmtGroupNo", "lmtGroupNo", "rstrctGrupNo"],
+  seqNo: ["rstrctSeqNo", "lmtSeqNo"],
+  licenseLimitName: ["lcnsLmtNm", "licenseLmtNm", "lmtLicenseNm", "prtcptLcnsLmtNm"],
+  allowedIndustryList: ["alwIndstrytyNm", "admisIndstrytyNm", "prmisnIndstrytyNm", "aloneIndstrytyNm"],
+};
+
 export const PRE_STANDARD_FIELD_CANDIDATES: FieldCandidates = {
   noticeNo: ["bfSpecRgstNo", "sptDscrptRegNo"],
   title: ["prdctClsfcNoNm", "bfSpecTaskNm", "bfSpecRgstNm", "reNm", "prdctNm"],
