@@ -34,6 +34,11 @@ const recipientsFileSchema = z.object({
   recipients: z.array(emailSchema).min(1, "recipients 배열이 비어있습니다 (최소 1명 필요)"),
 });
 
+const heldQualificationsFileSchema = z.object({
+  heldProducts: z.array(codeEntrySchema).min(1, "heldProducts 배열이 비어있습니다"),
+  heldIndustries: z.array(codeEntrySchema).min(1, "heldIndustries 배열이 비어있습니다"),
+});
+
 function readJsonFile(filePath: string): unknown {
   let raw: string;
   try {
@@ -80,6 +85,8 @@ export interface AppConfig {
   productCodes: CodeEntry[];
   industryCodes: CodeEntry[];
   recipients: string[];
+  heldProducts: CodeEntry[];
+  heldIndustries: CodeEntry[];
 }
 
 let cached: AppConfig | null = null;
@@ -91,10 +98,16 @@ export function loadAppConfig(): AppConfig {
   const keywordsPath = path.join(configDir, "keywords.json");
   const codesPath = path.join(configDir, "codes.json");
   const recipientsPath = path.join(configDir, "recipients.json");
+  const heldQualificationsPath = path.join(configDir, "held-qualifications.json");
 
   const keywordsData = parseOrThrow(keywordsFileSchema, readJsonFile(keywordsPath), keywordsPath);
   const codesData = parseOrThrow(codesFileSchema, readJsonFile(codesPath), codesPath);
   const recipientsData = parseOrThrow(recipientsFileSchema, readJsonFile(recipientsPath), recipientsPath);
+  const heldQualificationsData = parseOrThrow(
+    heldQualificationsFileSchema,
+    readJsonFile(heldQualificationsPath),
+    heldQualificationsPath
+  );
 
   const dupKeywords = findDuplicates(keywordsData.keywords);
   if (dupKeywords.length > 0) {
@@ -121,12 +134,24 @@ export function loadAppConfig(): AppConfig {
     throw new ConfigError(`recipients.json에 중복된 이메일이 있습니다: ${dupRecipients.join(", ")}`);
   }
 
+  const dupHeldProducts = findDuplicates(heldQualificationsData.heldProducts.map((c) => c.code));
+  if (dupHeldProducts.length > 0) {
+    throw new ConfigError(`held-qualifications.json heldProducts에 중복된 코드가 있습니다: ${dupHeldProducts.join(", ")}`);
+  }
+
+  const dupHeldIndustries = findDuplicates(heldQualificationsData.heldIndustries.map((c) => c.code));
+  if (dupHeldIndustries.length > 0) {
+    throw new ConfigError(`held-qualifications.json heldIndustries에 중복된 코드가 있습니다: ${dupHeldIndustries.join(", ")}`);
+  }
+
   cached = {
     keywords: keywordsData.keywords,
     excludeKeywords: keywordsData.excludeKeywords,
     productCodes: codesData.productCodes,
     industryCodes: codesData.industryCodes,
     recipients: recipientsData.recipients,
+    heldProducts: heldQualificationsData.heldProducts,
+    heldIndustries: heldQualificationsData.heldIndustries,
   };
   return cached;
 }

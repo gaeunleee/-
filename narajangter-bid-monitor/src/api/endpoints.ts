@@ -15,3 +15,6 @@ export const PRE_STANDARD_OPERATIONS: Record<BusinessType, string> = {
   용역: "getPublicPrcureThngInfoServc",
   공사: "getPublicPrcureThngInfoCnstwk",
 };
+
+/** 면허제한정보조회 - 본공고 API 소속 오퍼레이션 (사전규격에는 대응 오퍼레이션이 없어 본공고에만 적용) */
+export const LICENSE_LIMIT_OPERATION = "getBidPblancListInfoLicenseLimit";

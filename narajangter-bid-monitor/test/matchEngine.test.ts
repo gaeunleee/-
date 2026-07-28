@@ -30,6 +30,8 @@ const config: AppConfig = {
   productCodes: [{ code: "5512190301", name: "안내전광판" }],
   industryCodes: [{ code: "6815", name: "전시사업자" }],
   recipients: ["a@example.com"],
+  heldProducts: [{ code: "5512190301", name: "안내전광판" }],
+  heldIndustries: [{ code: "6815", name: "전시사업자" }],
 };
 
 describe("matchCodes", () => {
