@@ -43,10 +43,12 @@ export interface LicenseLimitFieldCandidates {
 
 export const LICENSE_LIMIT_FIELD_CANDIDATES: LicenseLimitFieldCandidates = {
   noticeNo: ["bidNtceNo"],
-  groupNo: ["rstrctGroupNo", "prtcptLmtGroupNo", "lmtGroupNo", "rstrctGrupNo"],
+  // lmtGrpNo가 npm run verify:api 실제 응답으로 확인된 필드명 (2026-07-28)
+  groupNo: ["lmtGrpNo", "rstrctGroupNo", "prtcptLmtGroupNo", "lmtGroupNo", "rstrctGrupNo"],
   seqNo: ["rstrctSeqNo", "lmtSeqNo"],
   licenseLimitName: ["lcnsLmtNm", "licenseLmtNm", "lmtLicenseNm", "prtcptLcnsLmtNm"],
-  allowedIndustryList: ["alwIndstrytyNm", "admisIndstrytyNm", "prmisnIndstrytyNm", "aloneIndstrytyNm"],
+  // permsnIndstrytyList가 npm run verify:api 실제 응답으로 확인된 필드명 (2026-07-28)
+  allowedIndustryList: ["permsnIndstrytyList", "alwIndstrytyNm", "admisIndstrytyNm", "prmisnIndstrytyNm", "aloneIndstrytyNm"],
 };
 
 export const PRE_STANDARD_FIELD_CANDIDATES: FieldCandidates = {

@@ -14,44 +14,29 @@ export interface LicenseLimitGroup {
   allowedNames: string[];
 }
 
-/**
- * 특정 공고의 면허제한(참가자격) 정보를 조회해 제한그룹 목록으로 정리한다.
- * 조회 실패/데이터 없음은 예외 없이 빈 배열을 반환한다 (호출측에서 fail-open 정책으로 처리하기 위함).
- */
-export async function fetchLicenseLimitGroups(env: Env, noticeNo: string, window: { begin: Date; end: Date }): Promise<LicenseLimitGroup[]> {
-  try {
-    const rawItems = await fetchAllPages(
-      {
-        baseUrl: env.naraBidBaseUrl ?? DEFAULT_BID_NOTICE_BASE_URL,
-        operation: LICENSE_LIMIT_OPERATION,
-        serviceKey: env.naraBidServiceKey,
-        params: {
-          inqryBgnDt: toApiDateTime(window.begin),
-          inqryEndDt: toApiDateTime(window.end),
-          bidNtceNo: noticeNo,
-        },
-        timeoutMs: env.apiTimeoutMs,
-        maxRetries: env.apiMaxRetries,
-        retryDelayMs: env.apiRetryDelayMs,
-        label: `면허제한정보/${noticeNo}`,
-      },
-      { numOfRows: 100, maxPages: 5, requestIntervalMs: 0 }
-    );
-
-    return groupRawItems(rawItems, noticeNo);
-  } catch (err) {
-    logger.warn(`면허제한정보 조회 실패 (자격 필터를 건너뛰고 통과시킴)`, { noticeNo, error: toErrorMessage(err) });
-    return [];
-  }
+/** "A, B / C" 같은 나열 텍스트를 개별 항목으로 분리 */
+function splitList(text: string): string[] {
+  return text
+    .split(/[,\/·、]/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 0);
 }
 
-export function groupRawItems(rawItems: RawItem[], noticeNo: string): LicenseLimitGroup[] {
-  const groups = new Map<string, string[]>();
+/**
+ * 면허제한정보조회 원본 응답을 입찰공고번호별 제한그룹 목록으로 정리한다.
+ *
+ * 주의: 이 오퍼레이션은 bidNtceNo 파라미터를 서버가 필터링해주지 않고 조회기간 내 전체를
+ * 페이지 단위로 내려준다(2026-07-28 실측 확인). 그래서 공고 1건씩 호출하는 대신
+ * 조회기간 전체를 한 번에 받아 여기서 공고번호별로 묶어 로컬에서 조회하는 방식으로 설계했다.
+ */
+export function groupRawItemsByNotice(rawItems: RawItem[]): Map<string, LicenseLimitGroup[]> {
+  const byNotice = new Map<string, Map<string, string[]>>();
 
   for (const item of rawItems) {
+    const noticeNo = pickString(item, LICENSE_LIMIT_FIELD_CANDIDATES.noticeNo);
     const groupNo = pickString(item, LICENSE_LIMIT_FIELD_CANDIDATES.groupNo);
-    if (!groupNo) {
-      warnMissingFieldOnce("면허제한정보", "groupNo", Object.keys(item));
+    if (!noticeNo || !groupNo) {
+      warnMissingFieldOnce("면허제한정보", "noticeNo/groupNo", Object.keys(item));
       continue;
     }
 
@@ -66,21 +51,49 @@ export function groupRawItems(rawItems: RawItem[], noticeNo: string): LicenseLim
       continue;
     }
 
-    const existing = groups.get(groupNo) ?? [];
-    groups.set(groupNo, [...existing, ...names]);
+    const groupsForNotice = byNotice.get(noticeNo) ?? new Map<string, string[]>();
+    groupsForNotice.set(groupNo, [...(groupsForNotice.get(groupNo) ?? []), ...names]);
+    byNotice.set(noticeNo, groupsForNotice);
   }
 
-  if (rawItems.length > 0 && groups.size === 0) {
-    logger.warn("면허제한정보 응답은 있었지만 그룹으로 정리하지 못했습니다 (필드명 확인 필요)", { noticeNo });
+  const result = new Map<string, LicenseLimitGroup[]>();
+  for (const [noticeNo, groupsForNotice] of byNotice) {
+    result.set(
+      noticeNo,
+      [...groupsForNotice.entries()].map(([groupNo, allowedNames]) => ({ groupNo, allowedNames }))
+    );
   }
-
-  return [...groups.entries()].map(([groupNo, allowedNames]) => ({ groupNo, allowedNames }));
+  return result;
 }
 
-/** "A, B / C" 같은 나열 텍스트를 개별 항목으로 분리 */
-function splitList(text: string): string[] {
-  return text
-    .split(/[,\/·、]/)
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+/**
+ * 조회기간 내 전체 면허제한정보를 한 번에 받아 입찰공고번호별로 정리해 반환한다.
+ * 조회 실패 시 예외 없이 빈 Map을 반환한다 (호출측에서 fail-open 정책으로 처리하기 위함).
+ */
+export async function fetchAllLicenseLimitGroups(env: Env, window: { begin: Date; end: Date }): Promise<Map<string, LicenseLimitGroup[]>> {
+  try {
+    const rawItems = await fetchAllPages(
+      {
+        baseUrl: env.naraBidBaseUrl ?? DEFAULT_BID_NOTICE_BASE_URL,
+        operation: LICENSE_LIMIT_OPERATION,
+        serviceKey: env.naraBidServiceKey,
+        params: {
+          inqryDiv: "1",
+          inqryBgnDt: toApiDateTime(window.begin),
+          inqryEndDt: toApiDateTime(window.end),
+        },
+        timeoutMs: env.apiTimeoutMs,
+        maxRetries: env.apiMaxRetries,
+        retryDelayMs: env.apiRetryDelayMs,
+        label: "면허제한정보",
+      },
+      { numOfRows: env.apiNumOfRows, maxPages: env.apiMaxPages, requestIntervalMs: env.apiRequestIntervalMs }
+    );
+
+    logger.info("면허제한정보 전체 조회 완료", { rawCount: rawItems.length });
+    return groupRawItemsByNotice(rawItems);
+  } catch (err) {
+    logger.warn("면허제한정보 조회 실패 (자격조건 필터를 건너뛰고 모두 통과시킴)", { error: toErrorMessage(err) });
+    return new Map();
+  }
 }
