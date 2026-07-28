@@ -1,0 +1,31 @@
+{
+  "name": "narajangter-bid-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "나라장터 입찰공고/사전규격 자동 모니터링 및 주간 이메일 리포트",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "report": "tsx src/index.ts",
+    "report:dry-run": "DRY_RUN=true tsx src/index.ts",
+    "verify:api": "tsx scripts/verifyApi.ts",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.5",
+    "fast-xml-parser": "^5.10.1",
+    "nodemailer": "^9.0.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/nodemailer": "^8.0.1",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3",
+    "vitest": "^4.1.10"
+  }
+}
