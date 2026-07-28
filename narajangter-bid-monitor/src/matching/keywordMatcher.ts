@@ -15,3 +15,14 @@ export function matchKeywords(notice: NormalizedNotice, keywords: string[]): str
   }
   return matched;
 }
+
+/**
+ * 제목에 제외 키워드가 포함되면 코드/키워드가 매칭되어도 결과에서 뺀다.
+ * 일반 구매/정비/공사처럼 코드·업종상으로는 걸리지만 실제로는 전시업과 무관한 공고를 걸러내기 위함.
+ */
+export function matchExcludeKeyword(notice: NormalizedNotice, excludeKeywords: string[]): string | null {
+  for (const keyword of excludeKeywords) {
+    if (notice.title.includes(keyword)) return keyword;
+  }
+  return null;
+}

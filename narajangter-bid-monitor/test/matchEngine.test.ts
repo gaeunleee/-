@@ -26,6 +26,7 @@ function makeNotice(overrides: Partial<NormalizedNotice> = {}): NormalizedNotice
 
 const config: AppConfig = {
   keywords: ["도서관", "전시"],
+  excludeKeywords: ["구입", "정비"],
   productCodes: [{ code: "5512190301", name: "안내전광판" }],
   industryCodes: [{ code: "6815", name: "전시사업자" }],
   recipients: ["a@example.com"],
@@ -73,6 +74,35 @@ describe("matchKeywords", () => {
   it("키워드가 없으면 빈 배열을 반환한다", () => {
     const notice = makeNotice({ title: "도로 포장 공사" });
     expect(matchKeywords(notice, config.keywords)).toEqual([]);
+  });
+});
+
+describe("제외 키워드", () => {
+  it("코드+키워드가 모두 매칭돼도 제외 키워드가 제목에 있으면 null이다", () => {
+    const notice = makeNotice({
+      businessType: "물품",
+      productClsfcNo: "5512190301",
+      title: "전시 안내전광판 구입",
+    });
+    expect(evaluateNotice(notice, config)).toBeNull();
+  });
+
+  it("업종코드로 매칭돼도 제외 키워드(정비)가 있으면 null이다", () => {
+    const notice = makeNotice({
+      businessType: "공사",
+      industryText: "전시사업자",
+      title: "전시관 정비 공사",
+    });
+    expect(evaluateNotice(notice, config)).toBeNull();
+  });
+
+  it("제외 키워드가 없으면 평소대로 매칭된다", () => {
+    const notice = makeNotice({
+      businessType: "물품",
+      productClsfcNo: "5512190301",
+      title: "전시 안내전광판 설치",
+    });
+    expect(evaluateNotice(notice, config)).not.toBeNull();
   });
 });
 

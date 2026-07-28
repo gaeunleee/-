@@ -1,11 +1,13 @@
 import type { NormalizedNotice } from "../api/types.js";
 import type { AppConfig } from "../config/loadJsonConfig.js";
 import { matchCodes } from "./codeMatcher.js";
-import { matchKeywords } from "./keywordMatcher.js";
+import { matchExcludeKeyword, matchKeywords } from "./keywordMatcher.js";
 import type { MatchedNotice } from "./types.js";
 
 /** 공고 하나를 코드+키워드 기준으로 평가하고, 둘 중 하나라도 매칭되면 결과를 반환한다 (아니면 null). */
 export function evaluateNotice(notice: NormalizedNotice, config: AppConfig): MatchedNotice | null {
+  if (matchExcludeKeyword(notice, config.excludeKeywords)) return null;
+
   const { matchedProductCodes, matchedIndustryCodes } = matchCodes(notice, config.productCodes, config.industryCodes);
   const matchedKeywords = matchKeywords(notice, config.keywords);
 
