@@ -22,6 +22,7 @@ const codeEntrySchema = z.object({
 
 const keywordsFileSchema = z.object({
   keywords: z.array(z.string().trim().min(1)).min(1, "keywords 배열이 비어있습니다"),
+  excludeKeywords: z.array(z.string().trim().min(1)).default([]),
 });
 
 const codesFileSchema = z.object({
@@ -47,7 +48,7 @@ function readJsonFile(filePath: string): unknown {
   }
 }
 
-function parseOrThrow<T>(schema: z.ZodType<T>, data: unknown, filePath: string): T {
+function parseOrThrow<S extends z.ZodTypeAny>(schema: S, data: unknown, filePath: string): z.infer<S> {
   const result = schema.safeParse(data);
   if (!result.success) {
     const details = result.error.issues
@@ -75,6 +76,7 @@ export interface CodeEntry {
 
 export interface AppConfig {
   keywords: string[];
+  excludeKeywords: string[];
   productCodes: CodeEntry[];
   industryCodes: CodeEntry[];
   recipients: string[];
@@ -99,6 +101,11 @@ export function loadAppConfig(): AppConfig {
     throw new ConfigError(`keywords.json에 중복된 키워드가 있습니다: ${dupKeywords.join(", ")}`);
   }
 
+  const dupExcludeKeywords = findDuplicates(keywordsData.excludeKeywords);
+  if (dupExcludeKeywords.length > 0) {
+    throw new ConfigError(`keywords.json excludeKeywords에 중복된 키워드가 있습니다: ${dupExcludeKeywords.join(", ")}`);
+  }
+
   const dupProductCodes = findDuplicates(codesData.productCodes.map((c) => c.code));
   if (dupProductCodes.length > 0) {
     throw new ConfigError(`codes.json productCodes에 중복된 코드가 있습니다: ${dupProductCodes.join(", ")}`);
@@ -116,6 +123,7 @@ export function loadAppConfig(): AppConfig {
 
   cached = {
     keywords: keywordsData.keywords,
+    excludeKeywords: keywordsData.excludeKeywords,
     productCodes: codesData.productCodes,
     industryCodes: codesData.industryCodes,
     recipients: recipientsData.recipients,
