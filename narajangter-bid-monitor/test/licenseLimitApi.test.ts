@@ -33,6 +33,18 @@ describe("groupRawItemsByNotice", () => {
     expect(byNotice.get("N-1")?.[0]?.allowedNames).toEqual(["전시사업자", "실내건축공사업", "소프트웨어사업자"]);
   });
 
+  it("실제 응답 형식인 대괄호(\"[업종명/업종코드]\") 나열을 업종명만 남기고 정리한다", () => {
+    const raw = [
+      {
+        bidNtceNo: "N-1",
+        lmtGrpNo: "1",
+        permsnIndstrytyList: "[축산물가공업(식육가공업)/4004][전시사업자/6815]",
+      },
+    ];
+    const byNotice = groupRawItemsByNotice(raw);
+    expect(byNotice.get("N-1")?.[0]?.allowedNames).toEqual(["축산물가공업(식육가공업)", "전시사업자"]);
+  });
+
   it("공고번호나 그룹번호가 없는 항목은 무시한다", () => {
     const raw = [{ someOtherField: "x" }, { bidNtceNo: "N-1" /* groupNo 없음 */ }];
     expect(groupRawItemsByNotice(raw).size).toBe(0);

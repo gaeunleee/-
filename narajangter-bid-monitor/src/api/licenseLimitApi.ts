@@ -14,8 +14,26 @@ export interface LicenseLimitGroup {
   allowedNames: string[];
 }
 
-/** "A, B / C" 같은 나열 텍스트를 개별 항목으로 분리 */
+/**
+ * 허용업종목록 텍스트를 개별 업종명으로 분리한다.
+ * 실측 결과 "[업종명/업종코드][업종명/업종코드]..." 형태의 대괄호 단위로 오는 것으로 확인되어
+ * (예: "[축산물가공업(식육가공업)/4004]"), 대괄호 단위로 먼저 나누고 각 단위에서
+ * 마지막 "/" 뒤의 코드를 떼어내 업종명만 남긴다. 대괄호가 없는 단순 나열 텍스트는
+ * 기존처럼 콤마/슬래시로 분리한다.
+ */
 function splitList(text: string): string[] {
+  const bracketed = [...text.matchAll(/\[([^\]]+)\]/g)]
+    .map((m) => m[1])
+    .filter((s): s is string => s !== undefined);
+  if (bracketed.length > 0) {
+    return bracketed
+      .map((entry) => {
+        const slashIndex = entry.lastIndexOf("/");
+        return (slashIndex === -1 ? entry : entry.slice(0, slashIndex)).trim();
+      })
+      .filter((s) => s.length > 0);
+  }
+
   return text
     .split(/[,\/·、]/)
     .map((s) => s.trim())
