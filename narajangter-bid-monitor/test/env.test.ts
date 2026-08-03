@@ -11,6 +11,9 @@ const REQUIRED_KEYS = [
   "DRY_RUN",
   "LOOKBACK_DAYS",
   "API_NUM_OF_ROWS",
+  "API_TIMEOUT_MS",
+  "API_MAX_RETRIES",
+  "API_RETRY_DELAY_MS",
   "SMTP_PORT",
   "LOG_LEVEL",
 ] as const;
@@ -61,6 +64,16 @@ describe("loadEnv", () => {
     process.env.DRY_RUN = "true";
     process.env.LOOKBACK_DAYS = "9999";
     expect(() => loadEnv()).toThrow(ConfigError);
+  });
+
+  it("API_TIMEOUT_MS 등을 지정하지 않으면 넉넉한 기본값(30초/4회 재시도)을 쓴다", () => {
+    // env.ts에 기본값이 두 곳(초기 선언부/parseInt_ fallback)에 따로 있다가 한쪽만 고쳐서
+    // 실제로는 옛 기본값(15초)이 쓰이던 회귀가 있었다 - 재발 방지용 테스트.
+    process.env.DRY_RUN = "true";
+    const env = loadEnv();
+    expect(env.apiTimeoutMs).toBe(30000);
+    expect(env.apiMaxRetries).toBe(4);
+    expect(env.apiRetryDelayMs).toBe(1500);
   });
 
   it("두번째 호출부터는 캐시된 값을 반환한다", () => {
