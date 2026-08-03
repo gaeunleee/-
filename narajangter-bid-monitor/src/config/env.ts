@@ -79,23 +79,28 @@ export function loadEnv(): Env {
     if (!smtpPass) errors.push("SMTP_PASS가 설정되지 않았습니다.");
   }
 
-  let lookbackDays = 7;
-  let apiNumOfRows = 500;
-  let apiMaxPages = 40;
-  let apiTimeoutMs = 30000;
-  let apiMaxRetries = 4;
-  let apiRetryDelayMs = 1500;
-  let apiRequestIntervalMs = 300;
-  let smtpPort = 587;
-  let logLevel: Env["logLevel"] = "info";
+  // 기본값은 각 parseInt_ 호출의 두 번째 인자 한 곳에만 정의한다 (여기 선언은 타입만 확보하는 용도).
+  // try 블록이 끝까지 성공해야만(=errors가 비어야만) 아래 cached 조립에서 실제로 쓰이므로,
+  // 이 시점의 초기값 자체는 의미가 없다 - 두 곳에 기본값을 따로 적어두면 한쪽만 고치는 실수가 나기 쉽다.
+  // 아래 값들은 try 블록에서 항상 채워지고, 채우다 실패하면 errors에 쌓여 곧바로 throw 되어
+  // 절대 읽히지 않는다 (TS는 이 제어흐름을 못 따라가므로 definite assignment assertion 사용).
+  let lookbackDays!: number;
+  let apiNumOfRows!: number;
+  let apiMaxPages!: number;
+  let apiTimeoutMs!: number;
+  let apiMaxRetries!: number;
+  let apiRetryDelayMs!: number;
+  let apiRequestIntervalMs!: number;
+  let smtpPort!: number;
+  let logLevel!: Env["logLevel"];
 
   try {
     lookbackDays = parseInt_(e.LOOKBACK_DAYS, 7, "LOOKBACK_DAYS", 1, 90);
     apiNumOfRows = parseInt_(e.API_NUM_OF_ROWS, 500, "API_NUM_OF_ROWS", 1, 999);
     apiMaxPages = parseInt_(e.API_MAX_PAGES, 40, "API_MAX_PAGES", 1, 500);
-    apiTimeoutMs = parseInt_(e.API_TIMEOUT_MS, 15000, "API_TIMEOUT_MS", 1000, 120000);
-    apiMaxRetries = parseInt_(e.API_MAX_RETRIES, 3, "API_MAX_RETRIES", 0, 10);
-    apiRetryDelayMs = parseInt_(e.API_RETRY_DELAY_MS, 1000, "API_RETRY_DELAY_MS", 0, 60000);
+    apiTimeoutMs = parseInt_(e.API_TIMEOUT_MS, 30000, "API_TIMEOUT_MS", 1000, 120000);
+    apiMaxRetries = parseInt_(e.API_MAX_RETRIES, 4, "API_MAX_RETRIES", 0, 10);
+    apiRetryDelayMs = parseInt_(e.API_RETRY_DELAY_MS, 1500, "API_RETRY_DELAY_MS", 0, 60000);
     apiRequestIntervalMs = parseInt_(e.API_REQUEST_INTERVAL_MS, 300, "API_REQUEST_INTERVAL_MS", 0, 60000);
     smtpPort = parseInt_(e.SMTP_PORT, 587, "SMTP_PORT", 1, 65535);
     logLevel = parseLogLevel(e.LOG_LEVEL);
