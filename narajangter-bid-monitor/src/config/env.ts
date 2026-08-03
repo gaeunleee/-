@@ -82,9 +82,9 @@ export function loadEnv(): Env {
   let lookbackDays = 7;
   let apiNumOfRows = 500;
   let apiMaxPages = 40;
-  let apiTimeoutMs = 15000;
-  let apiMaxRetries = 3;
-  let apiRetryDelayMs = 1000;
+  let apiTimeoutMs = 30000;
+  let apiMaxRetries = 4;
+  let apiRetryDelayMs = 1500;
   let apiRequestIntervalMs = 300;
   let smtpPort = 587;
   let logLevel: Env["logLevel"] = "info";
