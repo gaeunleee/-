@@ -78,6 +78,11 @@ describe("matchKeywords", () => {
     const notice = makeNotice({ title: "도로 포장 공사" });
     expect(matchKeywords(notice, config.keywords)).toEqual([]);
   });
+
+  it("제목과 키워드의 공백 유무가 달라도 매칭된다", () => {
+    const notice = makeNotice({ title: "도서관운영 용역" });
+    expect(matchKeywords(notice, ["도서관 운영"])).toEqual(["도서관 운영"]);
+  });
 });
 
 describe("제외 키워드", () => {
@@ -106,6 +111,28 @@ describe("제외 키워드", () => {
       title: "전시 안내전광판 설치",
     });
     expect(evaluateNotice(notice, config)).not.toBeNull();
+  });
+});
+
+describe("업종코드 단독 매칭", () => {
+  it("업종코드만 매칭되고 키워드가 없으면 null이다 (업종코드는 정밀도가 낮아 단독 불충분)", () => {
+    const notice = makeNotice({
+      businessType: "공사",
+      industryText: "전시사업자, 종합건설업",
+      title: "고속도로 방음벽 개량공사",
+    });
+    expect(evaluateNotice(notice, config)).toBeNull();
+  });
+
+  it("업종코드 + 키워드가 함께 매칭되면 강력추천이다", () => {
+    const notice = makeNotice({
+      businessType: "공사",
+      industryText: "전시사업자, 종합건설업",
+      title: "전시 공간 조성 공사",
+    });
+    const result = evaluateNotice(notice, config);
+    expect(result).not.toBeNull();
+    expect(result?.confidence).toBe("강력추천");
   });
 });
 
