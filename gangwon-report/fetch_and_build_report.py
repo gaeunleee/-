@@ -42,7 +42,8 @@ from openpyxl.utils import get_column_letter
 # 설정
 # ---------------------------------------------------------------------------
 
-BASE_URL = "http://apis.data.go.kr/1230000/ad/BidPublicInfoService"
+# http:// 접속 시 간헐적으로 연결 자체가 실패하는 것이 확인되어(2026-08-03) https:// 사용
+BASE_URL = "https://apis.data.go.kr/1230000/ad/BidPublicInfoService"
 OPERATIONS: dict[str, str] = {
     "용역": "getBidPblancListInfoServcPPSSrch",
     "공사": "getBidPblancListInfoCnstwkPPSSrch",
