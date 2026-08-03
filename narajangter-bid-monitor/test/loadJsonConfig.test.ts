@@ -57,6 +57,15 @@ describe("loadAppConfig", () => {
     const config = loadAppConfig();
     expect(config.keywords).toEqual(["도서관"]);
     expect(config.recipients).toEqual(["a@example.com"]);
+    expect(config.minBudgetAmount).toBeNull();
+  });
+
+  it("minBudgetAmount를 지정하면 그대로 로드한다", () => {
+    process.env.APP_CONFIG_DIR = writeConfigDir({
+      keywords: { keywords: ["도서관"], minBudgetAmount: 100_000_000 },
+    });
+    const config = loadAppConfig();
+    expect(config.minBudgetAmount).toBe(100_000_000);
   });
 
   it("잘못된 이메일 형식이면 ConfigError를 던진다", () => {

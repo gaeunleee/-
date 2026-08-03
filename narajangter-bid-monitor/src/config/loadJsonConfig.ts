@@ -23,6 +23,7 @@ const codeEntrySchema = z.object({
 const keywordsFileSchema = z.object({
   keywords: z.array(z.string().trim().min(1)).min(1, "keywords 배열이 비어있습니다"),
   excludeKeywords: z.array(z.string().trim().min(1)).default([]),
+  minBudgetAmount: z.number().nonnegative().nullable().default(null),
 });
 
 const codesFileSchema = z.object({
@@ -82,6 +83,7 @@ export interface CodeEntry {
 export interface AppConfig {
   keywords: string[];
   excludeKeywords: string[];
+  minBudgetAmount: number | null;
   productCodes: CodeEntry[];
   industryCodes: CodeEntry[];
   recipients: string[];
@@ -147,6 +149,7 @@ export function loadAppConfig(): AppConfig {
   cached = {
     keywords: keywordsData.keywords,
     excludeKeywords: keywordsData.excludeKeywords,
+    minBudgetAmount: keywordsData.minBudgetAmount,
     productCodes: codesData.productCodes,
     industryCodes: codesData.industryCodes,
     recipients: recipientsData.recipients,

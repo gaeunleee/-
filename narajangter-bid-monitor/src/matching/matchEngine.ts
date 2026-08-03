@@ -8,6 +8,10 @@ import type { MatchedNotice } from "./types.js";
 export function evaluateNotice(notice: NormalizedNotice, config: AppConfig): MatchedNotice | null {
   if (matchExcludeKeyword(notice, config.excludeKeywords)) return null;
 
+  if (config.minBudgetAmount != null && notice.budgetAmount != null && notice.budgetAmount < config.minBudgetAmount) {
+    return null;
+  }
+
   const { matchedProductCodes, matchedIndustryCodes } = matchCodes(notice, config.productCodes, config.industryCodes);
   const matchedKeywords = matchKeywords(notice, config.keywords);
 

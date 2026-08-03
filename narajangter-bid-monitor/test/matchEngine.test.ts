@@ -27,6 +27,7 @@ function makeNotice(overrides: Partial<NormalizedNotice> = {}): NormalizedNotice
 const config: AppConfig = {
   keywords: ["도서관", "전시"],
   excludeKeywords: ["구입", "정비"],
+  minBudgetAmount: null,
   productCodes: [{ code: "5512190301", name: "안내전광판" }],
   industryCodes: [{ code: "6815", name: "전시사업자" }],
   recipients: ["a@example.com"],
@@ -103,6 +104,50 @@ describe("제외 키워드", () => {
       businessType: "물품",
       productClsfcNo: "5512190301",
       title: "전시 안내전광판 설치",
+    });
+    expect(evaluateNotice(notice, config)).not.toBeNull();
+  });
+});
+
+describe("최소 예산금액 필터", () => {
+  const budgetConfig: AppConfig = { ...config, minBudgetAmount: 100_000_000 };
+
+  it("예산금액이 기준보다 작으면 코드/키워드가 매칭돼도 null이다", () => {
+    const notice = makeNotice({
+      businessType: "물품",
+      productClsfcNo: "5512190301",
+      title: "전시 안내전광판 설치",
+      budgetAmount: 50_000_000,
+    });
+    expect(evaluateNotice(notice, budgetConfig)).toBeNull();
+  });
+
+  it("예산금액이 기준 이상이면 매칭된다", () => {
+    const notice = makeNotice({
+      businessType: "물품",
+      productClsfcNo: "5512190301",
+      title: "전시 안내전광판 설치",
+      budgetAmount: 150_000_000,
+    });
+    expect(evaluateNotice(notice, budgetConfig)).not.toBeNull();
+  });
+
+  it("예산금액이 없으면(null) 판단할 수 없으므로 제외하지 않는다", () => {
+    const notice = makeNotice({
+      businessType: "물품",
+      productClsfcNo: "5512190301",
+      title: "전시 안내전광판 설치",
+      budgetAmount: null,
+    });
+    expect(evaluateNotice(notice, budgetConfig)).not.toBeNull();
+  });
+
+  it("minBudgetAmount가 null이면 예산과 무관하게 매칭된다", () => {
+    const notice = makeNotice({
+      businessType: "물품",
+      productClsfcNo: "5512190301",
+      title: "전시 안내전광판 설치",
+      budgetAmount: 1,
     });
     expect(evaluateNotice(notice, config)).not.toBeNull();
   });
