@@ -42,7 +42,15 @@ function rebuildAll() {
 }
 
 // ─── 월별 시트 구성 ──────────────────────────────────────────────────────────
+function ensureSize(sheet, rows, cols) {
+  var curRows = sheet.getMaxRows();
+  if (curRows < rows) sheet.insertRowsAfter(curRows, rows - curRows);
+  var curCols = sheet.getMaxColumns();
+  if (curCols < cols) sheet.insertColumnsAfter(curCols, cols - curCols);
+}
+
 function buildSheet(sheet, mnNum, prevMn) {
+  ensureSize(sheet, 2010, 80);
   sheet.setRowHeight(1, 28);
   sheet.setRowHeight(2, 22);
   sheet.setRowHeight(3, 22);
