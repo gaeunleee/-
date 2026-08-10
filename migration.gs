@@ -182,8 +182,8 @@ function buildSheet(sheet, mnNum, prevMn) {
   };
   Object.keys(w).forEach(function(c){ sheet.setColumnWidth(+c, w[c]); });
 
-  sheet.setFrozenRows(COLHEAD_ROW);
   buildCharts(sheet, prevMn);
+  sheet.setFrozenRows(COLHEAD_ROW);
 }
 
 // ─── 가계평가 섹션 (AD~AI 열) ────────────────────────────────────────────────
