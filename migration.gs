@@ -171,8 +171,8 @@ function buildGP(sheet, prevMn) {
     sheet.getRange(r, 33).setFormula('=AE'+r+'-AF'+r).setNumberFormat('+#,##0;-#,##0;0');
     sheet.getRange(r, 34).setFormula('=IFERROR(AG'+r+'/AF'+r+',0)').setNumberFormat('0.0%');
     sheet.getRange(r, 35).setFormula(
-      '=IF(AH'+r+'>0.1,"⚠️ "+TEXT(ABS(AG'+r+'),"#,##0")+"원 초과",'
-      +'IF(AH'+r+'<-0.1,"✅ "+TEXT(ABS(AG'+r+'),"#,##0")+"원 절약","🟢 유사 수준"))');
+      '=IF(AH'+r+'>0.1,"⚠️ "&TEXT(ABS(AG'+r+'),"#,##0")&"원 초과",'
+      +'IF(AH'+r+'<-0.1,"✅ "&TEXT(ABS(AG'+r+'),"#,##0")&"원 절약","🟢 유사 수준"))');
   });
 
   // 총합 행
@@ -350,14 +350,30 @@ function reMigrate(newSS) {
   });
 }
 
+function normalizeCard(card, sc) {
+  var c = String(card).trim();
+  if (sc === 1) {        // 인천 개인
+    if (/로카|롯데/.test(c)) return '인천 로카';
+    if (/삼성/.test(c))     return '인천 삼성';
+    if (/카카오/.test(c))   return '인천 카카오';
+  } else if (sc === 8) {  // 가은 개인
+    if (/로카|롯데/.test(c)) return '가은 로카';
+    if (/카카오/.test(c))   return '가은 카카오';
+    if (/하나/.test(c))     return '가은 하나';
+  }
+  return c;
+}
+
 function wSec(sheet, rows, sc) {
   rows.forEach(function(row, i) {
     var r = DATA_ROW + i;
     for (var c = 0; c < 6; c++) {
       if (row[c] === '' || row[c] == null) continue;
       var cell = sheet.getRange(r, sc + c);
-      if (row[c] instanceof Date) cell.setValue(row[c]).setNumberFormat(DATE_FMT);
-      else cell.setValue(row[c]);
+      var val = row[c];
+      if (c === 5) val = normalizeCard(val, sc);
+      if (val instanceof Date) cell.setValue(val).setNumberFormat(DATE_FMT);
+      else cell.setValue(val);
     }
   });
 }
