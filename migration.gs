@@ -1,5 +1,5 @@
 var OLD_SS_ID  = '1HDhrERTUA8R6lTulXVLBltODbqwYYKETQ7Jd5r40WxU';
-var NEW_SS_ID  = '1jMEQxxAh1T581RDyBIE9_0K3bVrnSad1PX8SEyzoGTw';
+var NEW_SS_ID  = '1jMEQxxAhiT581RDyBIE9_0K3bVrnSad1PX8SEyzoGTw';
 var MONTHS     = ['1월','2월','3월','4월','5월','6월','7월','8월','9월','10월','11월','12월'];
 var INC_CARDS  = ['인천 로카','인천 삼성','인천 카카오'];
 var GAE_CARDS  = ['가은 로카','가은 카카오','가은 하나'];

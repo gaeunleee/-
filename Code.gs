@@ -12,7 +12,7 @@
 
 // ── 상수 ──────────────────────────────────────────────────────
 
-var SPREADSHEET_ID = '1jMEQxxAh1T581RDyBIE9_0K3bVrnSad1PX8SEyzoGTw';
+var SPREADSHEET_ID = '1jMEQxxAhiT581RDyBIE9_0K3bVrnSad1PX8SEyzoGTw';
 
 /** 데이터 시작 행 */
 var DATA_START_ROW = 5;
