@@ -15,7 +15,7 @@
 var SPREADSHEET_ID = '1jMEQxxAhiT581RDyBIE9_0K3bVrnSad1PX8SEyzoGTw';
 
 /** 데이터 시작 행 */
-var DATA_START_ROW = 29;
+var DATA_START_ROW = 28;
 
 var JOINT_MERCHANTS   = ['지엠마트', '정육점', '다이소', '신선지엠'];
 var PERSONAL_MERCHANTS = ['올리브영', '미용실', '헤어'];

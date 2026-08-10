@@ -11,17 +11,17 @@ var DATE_FMT   = 'M"월 "D"일 ("ddd")"';
 
 // ─── 시트 레이아웃 (대시보드 상단 + 거래 테이블 하단) ─────────────────────────
 var CHART_ROW    = 2000;  // 차트용 숨은 데이터 영역 (화면 밖)
-var CHART_TOP    = 5;     // 전월비교 차트 그리는 시작행
-var GP_TITLE_ROW = 4;     // 가계평가 타이틀바
-var GP_HEAD_ROW  = 5;     // 가계평가 컬럼헤더
-var GP_DATA_ROW  = 6;     // 가계평가 데이터 (6,7,8행)
+var CHART_TOP    = 4;     // 전월비교 차트 그리는 시작행
+var GP_TITLE_ROW = 3;     // 가계평가 타이틀바
+var GP_HEAD_ROW  = 4;     // 가계평가 컬럼헤더
+var GP_DATA_ROW  = 5;     // 가계평가 데이터 (5,6,7,8행: 인천개인/가은개인/공동/고정비)
 var GP_TOTAL_ROW = 9;     // 가계평가 총합계
-var COMMENT_TOP  = 20;    // "이번 달 분석" 코멘트 시작행 (19행이 라벨)
-var HEADER_ROW   = 25;    // 거래 테이블 섹션 헤더
-var SUM1_ROW     = 26;    // 카드별 합계 1
-var SUM2_ROW     = 27;    // 카드별 합계 2 / 섹션 합계
-var COLHEAD_ROW  = 28;    // 거래 테이블 컬럼헤더
-var DATA_ROW     = 29;    // 거래 데이터 시작행
+var COMMENT_TOP  = 19;    // "이번 달 분석" 코멘트 시작행 (18행이 라벨)
+var HEADER_ROW   = 24;    // 거래 테이블 섹션 헤더
+var SUM1_ROW     = 25;    // 카드별 합계 1
+var SUM2_ROW     = 26;    // 카드별 합계 2 / 섹션 합계
+var COLHEAD_ROW  = 27;    // 거래 테이블 컬럼헤더
+var DATA_ROW     = 28;    // 거래 데이터 시작행
 
 var PREV_MN    = {
   '1월':null,'2월':'1월','3월':'2월','4월':'3월','5월':'4월','6월':'5월',
@@ -76,36 +76,32 @@ function colLetter(col) {
 function buildSheet(sheet, mnNum, prevMn) {
   ensureSize(sheet, 2010, 85);
 
-  sheet.setRowHeight(1, 32);
-  sheet.setRowHeight(2, 24);
-  sheet.setRowHeight(3, 10);
+  sheet.setRowHeight(1, 26);
+  sheet.setRowHeight(2, 10);
   sheet.setRowHeight(GP_TITLE_ROW, 24);
   for (var gr = GP_HEAD_ROW; gr <= GP_TOTAL_ROW; gr++) sheet.setRowHeight(gr, 20);
   sheet.setRowHeight(COMMENT_TOP - 1, 24);
-  for (var cr2 = COMMENT_TOP; cr2 < COMMENT_TOP + 4; cr2++) sheet.setRowHeight(cr2, 26);
+  for (var cr2 = COMMENT_TOP; cr2 < COMMENT_TOP + 4; cr2++) sheet.setRowHeight(cr2, 28);
   sheet.setRowHeight(HEADER_ROW, 28);
   sheet.setRowHeight(SUM1_ROW, 22);
   sheet.setRowHeight(SUM2_ROW, 22);
   sheet.setRowHeight(COLHEAD_ROW, 22);
 
-  // ── 0. 타이틀 + 요약 ──
-  sheet.getRange(1, 1, 1, 20).merge().setValue(mnNum + '월 가계부')
-    .setBackground('#1c4587').setFontColor('#fff').setFontSize(16)
-    .setFontWeight('bold').setHorizontalAlignment('center');
-
+  // ── 0. 요약 바 (타이틀 대신 바로 요약 정보) ──
   var totalCur = 'SUM(B$' + DATA_ROW + ':B$999)+SUM(I$' + DATA_ROW + ':I$999)+SUM(P$' + DATA_ROW + ':P$999)+SUM(W$' + DATA_ROW + ':W$999)';
-  sheet.getRange(2, 1).setValue('이번 달 총지출').setFontWeight('bold');
-  sheet.getRange(2, 3).setFormula('=' + totalCur).setNumberFormat('#,##0"원"').setFontWeight('bold').setFontSize(12);
-  sheet.getRange(2, 6).setValue('전월대비');
+  sheet.getRange(1, 1).setValue(mnNum + '월 총지출').setFontWeight('bold');
+  sheet.getRange(1, 3).setFormula('=' + totalCur).setNumberFormat('#,##0"원"').setFontWeight('bold').setFontSize(12);
+  sheet.getRange(1, 6).setValue('전월대비');
   if (prevMn) {
     var prevTotal = 'IFERROR(SUM(INDIRECT("\'' + prevMn + '\'!B' + DATA_ROW + ':B999"))+SUM(INDIRECT("\'' + prevMn + '\'!I' + DATA_ROW + ':I999"))+SUM(INDIRECT("\'' + prevMn + '\'!P' + DATA_ROW + ':P999"))+SUM(INDIRECT("\'' + prevMn + '\'!W' + DATA_ROW + ':W999")),0)';
-    sheet.getRange(2, 7).setFormula('=(' + totalCur + ')-(' + prevTotal + ')').setNumberFormat('+#,##0"원";-#,##0"원";0"원"');
-    sheet.getRange(2, 9).setFormula('=IFERROR(((' + totalCur + ')-(' + prevTotal + '))/(' + prevTotal + '),0)').setNumberFormat('+0.0%;-0.0%;0%');
+    sheet.getRange(1, 7).setFormula('=(' + totalCur + ')-(' + prevTotal + ')').setNumberFormat('+#,##0"원";-#,##0"원";0"원"');
+    sheet.getRange(1, 9).setFormula('=IFERROR(((' + totalCur + ')-(' + prevTotal + '))/(' + prevTotal + '),0)').setNumberFormat('+0.0%;-0.0%;0%');
   } else {
-    sheet.getRange(2, 7).setValue('-');
+    sheet.getRange(1, 7).setValue('-');
   }
+  sheet.getRange(1, 1, 1, 20).setBackground('#1c4587').setFontColor('#fff').setVerticalAlignment('middle');
 
-  // ── 1. 가계평가 (AD~AI, 대시보드 상단에 고정 배치) ──
+  // ── 1. 가계평가 (AD~AI, 대시보드 상단에 고정 배치, 고정비는 별도 행) ──
   mH(sheet, colLetter(30) + GP_TITLE_ROW + ':' + colLetter(35) + GP_TITLE_ROW, '가계평가', '#e69138');
   ['구분', '당월', '전월', '증감', '증감률', '평가'].forEach(function(v, i) {
     sheet.getRange(GP_HEAD_ROW, 30 + i).setValue(v).setBackground('#fce5cd').setFontWeight('bold');
@@ -186,39 +182,26 @@ function buildSheet(sheet, mnNum, prevMn) {
   sheet.setFrozenRows(COLHEAD_ROW);
 }
 
-// ─── 가계평가 섹션 (AD~AI 열) ────────────────────────────────────────────────
+// ─── 가계평가 섹션 (AD~AI 열, 고정비는 별도 행으로 분리) ─────────────────────
 function buildGP(sheet, prevMn) {
-  function pRef(col) {
-    return 'INDIRECT("\'' + prevMn + '\'!' + col + DATA_ROW + ':' + col + '999")';
+  function prevSum(col) {
+    return prevMn ? '=IFERROR(SUM(INDIRECT("\''+prevMn+'\'!'+col+DATA_ROW+':'+col+'999")),0)' : null;
   }
 
   var sections = [
-    {
-      label: '인천 (개인+고정)',
-      curF:  '=SUM(B$' + DATA_ROW + ':B$999)+SUMIF(AA$' + DATA_ROW + ':AA$999,"인천",W$' + DATA_ROW + ':W$999)',
-      prevF: prevMn ? '=IFERROR(SUM('+pRef('B')+')+SUMIF('+pRef('AA')+',"인천",'+pRef('W')+'),0)' : null
-    },
-    {
-      label: '가은 (개인+고정)',
-      curF:  '=SUM(I$' + DATA_ROW + ':I$999)+SUMIF(AA$' + DATA_ROW + ':AA$999,"가은",W$' + DATA_ROW + ':W$999)',
-      prevF: prevMn ? '=IFERROR(SUM('+pRef('I')+')+SUMIF('+pRef('AA')+',"가은",'+pRef('W')+'),0)' : null
-    },
-    {
-      label: '공동 (지출+고정)',
-      curF:  '=SUM(P$' + DATA_ROW + ':P$999)+SUMIF(AA$' + DATA_ROW + ':AA$999,"공동",W$' + DATA_ROW + ':W$999)',
-      prevF: prevMn ? '=IFERROR(SUM('+pRef('P')+')+SUMIF('+pRef('AA')+',"공동",'+pRef('W')+'),0)' : null
-    }
+    { label:'인천 개인지출', col:'B' },
+    { label:'가은 개인지출', col:'I' },
+    { label:'공동지출',      col:'P' },
+    { label:'고정비',        col:'W' }
   ];
 
   sections.forEach(function(sec, i) {
     var r = GP_DATA_ROW + i;
     sheet.getRange(r, 30).setValue(sec.label).setFontWeight('bold');
-    sheet.getRange(r, 31).setFormula(sec.curF).setNumberFormat('#,##0');
-    if (sec.prevF) {
-      sheet.getRange(r, 32).setFormula(sec.prevF).setNumberFormat('#,##0');
-    } else {
-      sheet.getRange(r, 32).setValue(0).setNumberFormat('#,##0');
-    }
+    sheet.getRange(r, 31).setFormula('=SUM('+sec.col+'$'+DATA_ROW+':'+sec.col+'$999)').setNumberFormat('#,##0');
+    var pf = prevSum(sec.col);
+    if (pf) sheet.getRange(r, 32).setFormula(pf).setNumberFormat('#,##0');
+    else sheet.getRange(r, 32).setValue(0).setNumberFormat('#,##0');
     sheet.getRange(r, 33).setFormula('=AE'+r+'-AF'+r).setNumberFormat('+#,##0;-#,##0;0');
     sheet.getRange(r, 34).setFormula('=IFERROR(AG'+r+'/AF'+r+',0)').setNumberFormat('0.0%');
     sheet.getRange(r, 35).setFormula(
@@ -226,17 +209,17 @@ function buildGP(sheet, prevMn) {
       +'IF(AH'+r+'<-0.1,"✅ "&TEXT(ABS(AG'+r+'),"#,##0")&"원 절약","🟢 유사 수준"))');
   });
 
-  var r0 = GP_DATA_ROW, r2 = GP_DATA_ROW + 2, rt = GP_TOTAL_ROW;
+  var r0 = GP_DATA_ROW, r3 = GP_DATA_ROW + 3, rt = GP_TOTAL_ROW;
   var bg = '#fff2cc';
   sheet.getRange(rt, 30).setValue('총 합계').setFontWeight('bold').setBackground(bg);
-  sheet.getRange(rt, 31).setFormula('=SUM(AE'+r0+':AE'+r2+')').setFontWeight('bold').setBackground(bg).setNumberFormat('#,##0');
-  sheet.getRange(rt, 32).setFormula('=SUM(AF'+r0+':AF'+r2+')').setFontWeight('bold').setBackground(bg).setNumberFormat('#,##0');
+  sheet.getRange(rt, 31).setFormula('=SUM(AE'+r0+':AE'+r3+')').setFontWeight('bold').setBackground(bg).setNumberFormat('#,##0');
+  sheet.getRange(rt, 32).setFormula('=SUM(AF'+r0+':AF'+r3+')').setFontWeight('bold').setBackground(bg).setNumberFormat('#,##0');
   sheet.getRange(rt, 33).setFormula('=AE'+rt+'-AF'+rt).setFontWeight('bold').setBackground(bg).setNumberFormat('+#,##0;-#,##0;0');
   sheet.getRange(rt, 34).setFormula('=IFERROR(AG'+rt+'/AF'+rt+',0)').setFontWeight('bold').setBackground(bg).setNumberFormat('0.0%');
   sheet.getRange(rt, 35).setFormula('=IF(AH'+rt+'>0.05,"📊 전체 지출 증가","📊 전체 지출 안정/감소")').setBackground(bg);
 }
 
-// ─── 전월비교 차트 3개 + 카테고리 분석 헬퍼 데이터 ────────────────────────────
+// ─── 전월비교 차트 3개 (카테고리를 행으로, 당월/전월을 열로 — 카테고리별 비교) ──
 function buildCharts(sheet, prevMn) {
   var chartDefs = [
     {title:'인천 전월비교', name:'인천', aC:'B', cC:'C', anchorCol:1},
@@ -247,53 +230,59 @@ function buildCharts(sheet, prevMn) {
   var helperAddrs = [];
 
   chartDefs.forEach(function(d, idx) {
-    var dc = 42 + idx * 12;
-    var catRow = CHART_ROW, curRow = CHART_ROW+1, prevRow = CHART_ROW+2, incRow = CHART_ROW+3;
+    var dc = 42 + idx * 6;
+    var headRow = CHART_ROW - 1;
 
-    sheet.getRange(catRow,  dc).setValue('카테고리');
-    sheet.getRange(curRow,  dc).setValue('당월');
-    sheet.getRange(prevRow, dc).setValue('전월');
-    sheet.getRange(incRow,  dc).setValue('증감');
+    sheet.getRange(headRow, dc).setValue('카테고리');
+    sheet.getRange(headRow, dc+1).setValue('당월');
+    sheet.getRange(headRow, dc+2).setValue('전월');
 
     CATEGORIES.forEach(function(cat, ci) {
-      var c = dc + 1 + ci;
-      sheet.getRange(catRow, c).setValue(cat);
-      sheet.getRange(curRow, c).setFormula(
+      var r = CHART_ROW + ci;
+      sheet.getRange(r, dc).setValue(cat);
+      sheet.getRange(r, dc+1).setFormula(
         '=SUMIF('+d.cC+'$'+DATA_ROW+':'+d.cC+'$999,"'+cat+'",'+d.aC+'$'+DATA_ROW+':'+d.aC+'$999)');
       if (prevMn) {
-        sheet.getRange(prevRow, c).setFormula(
+        sheet.getRange(r, dc+2).setFormula(
           '=IFERROR(SUMIF(INDIRECT("\''+prevMn+'\'!'+d.cC+DATA_ROW+':'+d.cC+'999"),"'+cat+'",'
           +'INDIRECT("\''+prevMn+'\'!'+d.aC+DATA_ROW+':'+d.aC+'999")),0)');
       } else {
-        sheet.getRange(prevRow, c).setValue(0);
+        sheet.getRange(r, dc+2).setValue(0);
       }
-      var colL = colLetter(c);
-      sheet.getRange(incRow, c).setFormula('='+colL+curRow+'-'+colL+prevRow);
+      sheet.getRange(r, dc+3).setFormula('='+colLetter(dc+1)+r+'-'+colLetter(dc+2)+r);
     });
 
-    var catRange = colLetter(dc+1)+catRow+':'+colLetter(dc+9)+catRow;
-    var curRange = colLetter(dc+1)+curRow+':'+colLetter(dc+9)+curRow;
-    var incRange = colLetter(dc+1)+incRow+':'+colLetter(dc+9)+incRow;
+    var lastR = CHART_ROW + CATEGORIES.length - 1;
+    var catRange  = colLetter(dc)   + CHART_ROW + ':' + colLetter(dc)   + lastR;
+    var curRange  = colLetter(dc+1) + CHART_ROW + ':' + colLetter(dc+1) + lastR;
+    var prevRange = colLetter(dc+2) + CHART_ROW + ':' + colLetter(dc+2) + lastR;
+    var incRange  = colLetter(dc+3) + CHART_ROW + ':' + colLetter(dc+3) + lastR;
 
-    var hCol = dc + 11;
-    sheet.getRange(catRow,  hCol).setFormula('=INDEX('+catRange+',MATCH(MAX('+curRange+'),'+curRange+',0))');
-    sheet.getRange(curRow,  hCol).setFormula('=MAX('+curRange+')');
-    sheet.getRange(prevRow, hCol).setFormula('=IFERROR('+colLetter(hCol)+curRow+'/SUM('+curRange+'),0)');
-    sheet.getRange(incRow,  hCol).setFormula('=INDEX('+incRange+',MATCH(MAX('+curRange+'),'+curRange+',0))');
+    var hCol = dc + 5; // 헬퍼 값 저장 열 (차트 범위와 안 겹치는 위치)
+    // 가장 많이 "증가"한 카테고리
+    sheet.getRange(CHART_ROW,   hCol).setFormula('=INDEX('+catRange+',MATCH(MAX('+incRange+'),'+incRange+',0))');
+    sheet.getRange(CHART_ROW+1, hCol).setFormula('=MAX('+incRange+')');
+    sheet.getRange(CHART_ROW+2, hCol).setFormula('=INDEX('+curRange+',MATCH(MAX('+incRange+'),'+incRange+',0))');
+    sheet.getRange(CHART_ROW+3, hCol).setFormula('=INDEX('+prevRange+',MATCH(MAX('+incRange+'),'+incRange+',0))');
+    // 가장 많이 "감소"한 카테고리
+    sheet.getRange(CHART_ROW+4, hCol).setFormula('=INDEX('+catRange+',MATCH(MIN('+incRange+'),'+incRange+',0))');
+    sheet.getRange(CHART_ROW+5, hCol).setFormula('=MIN('+incRange+')');
 
     helperAddrs.push({
-      name:     d.name,
-      topCat:   colLetter(hCol)+catRow,
-      topAmt:   colLetter(hCol)+curRow,
-      topShare: colLetter(hCol)+prevRow,
-      topInc:   colLetter(hCol)+incRow
+      name:    d.name,
+      incCat:  colLetter(hCol)+CHART_ROW,
+      incAmt:  colLetter(hCol)+(CHART_ROW+1),
+      incCur:  colLetter(hCol)+(CHART_ROW+2),
+      incPrev: colLetter(hCol)+(CHART_ROW+3),
+      decCat:  colLetter(hCol)+(CHART_ROW+4),
+      decAmt:  colLetter(hCol)+(CHART_ROW+5)
     });
 
     var chart = sheet.newChart()
       .setChartType(Charts.ChartType.COLUMN)
-      .addRange(sheet.getRange(catRow, dc, 3, CATEGORIES.length + 1))
+      .addRange(sheet.getRange(headRow, dc, CATEGORIES.length + 1, 3))
       .setOption('title', d.title)
-      .setOption('legend', {position:'bottom'})
+      .setOption('legend', {position:'top'})
       .setOption('vAxis', {format:'#,##0'})
       .setOption('hAxis', {textStyle:{fontSize:9}, slantedText:true, slantedTextAngle:30})
       .setOption('colors', ['#4285F4','#EA4335'])
@@ -307,24 +296,26 @@ function buildCharts(sheet, prevMn) {
   buildComments(sheet, helperAddrs);
 }
 
-// ─── "이번 달 분석" 코멘트 (인천/가은/공동 각각 + 종합) ───────────────────────
+// ─── "이번 달 분석" 코멘트 (전월 대비 증감 중심, 인천/가은/공동 각각 + 종합) ──
 function buildComments(sheet, helperAddrs) {
   sheet.getRange(COMMENT_TOP - 1, 1, 1, 20).merge()
     .setValue('💬 이번 달 분석').setFontWeight('bold').setFontSize(12);
 
   helperAddrs.forEach(function(h, i) {
+    var gpRow = GP_DATA_ROW + i; // 0:인천개인, 1:가은개인, 2:공동 (가계평가표와 같은 순서)
     var r = COMMENT_TOP + i;
-    var f = '="💬 '+h.name+': " & '+h.topCat+' & " " & TEXT('+h.topAmt+',"#,##0") & "원으로 이번 달 '+h.name+' 지출의 " & TEXT('+h.topShare+',"0%") & " 차지" & '
-      + 'IF('+h.topShare+'>0.3," ⚠️ 비중이 큰 편이라 줄이는 걸 권장해요.", '
-      + 'IF('+h.topInc+'>30000," 📈 전월보다 "&TEXT('+h.topInc+',"#,##0")&"원 늘었어요.", '
-      + 'IF('+h.topInc+'<-30000," 📉 전월보다 "&TEXT(-('+h.topInc+'),"#,##0")&"원 줄었어요. 잘하고 있어요!", " 무난한 수준이에요.")))';
+    var f =
+      '="💬 '+h.name+': 전월보다 " & IF(AG'+gpRow+'>=0,"","-") & TEXT(ABS(AG'+gpRow+'),"#,##0") & "원 " & IF(AG'+gpRow+'>=0,"더 썼어요.","덜 썼어요.") & " " & '
+      + 'IF('+h.incAmt+'>10000," ⚠️ "&'+h.incCat+'&"가 "&TEXT('+h.incAmt+',"#,##0")&"원 늘어서 가장 많이 증가했어요 (당월 "&TEXT('+h.incCur+',"#,##0")&"원, 전월 "&TEXT('+h.incPrev+',"#,##0")&"원).",'
+      + 'IF('+h.decAmt+'<-10000," ✅ "&'+h.decCat+'&"가 "&TEXT(ABS('+h.decAmt+'),"#,##0")&"원 줄어서 가장 많이 절약했어요.",'
+      + '" 🟢 지난달과 비슷한 지출 패턴이에요."))';
     sheet.getRange(r, 1, 1, 20).merge().setFormula(f).setFontSize(11).setVerticalAlignment('middle');
   });
 
   var r2 = COMMENT_TOP + helperAddrs.length;
   var f2 = '="💬 종합: " & IF(B'+SUM2_ROW+'>I'+SUM2_ROW+',"이번 달은 인천 개인지출이 가은보다 "&TEXT(B'+SUM2_ROW+'-I'+SUM2_ROW+',"#,##0")&"원 더 많았어요.",'
     + 'IF(I'+SUM2_ROW+'>B'+SUM2_ROW+',"이번 달은 가은 개인지출이 인천보다 "&TEXT(I'+SUM2_ROW+'-B'+SUM2_ROW+',"#,##0")&"원 더 많았어요.",'
-    + '"이번 달 인천과 가은 개인지출이 비슷했어요.")) & " 공동지출 중 가장 큰 항목은 " & '+helperAddrs[2].topCat+' & "이에요."';
+    + '"이번 달 인천과 가은 개인지출이 비슷했어요.")) & " 전체 지출은 전월보다 " & IF(AG'+GP_TOTAL_ROW+'>=0,"","-") & TEXT(ABS(AG'+GP_TOTAL_ROW+'),"#,##0") & "원 " & IF(AG'+GP_TOTAL_ROW+'>=0,"늘었어요.","줄었어요.")';
   sheet.getRange(r2, 1, 1, 20).merge().setFormula(f2).setFontSize(11).setVerticalAlignment('middle');
 }
 
@@ -435,7 +426,7 @@ function reMigrate(newSS) {
       if (r[14] && r[15]) jnt.push(r.slice(14, 20));
     });
     wSec(nw, inc, 1); wSec(nw, gae, 8); wSec(nw, jnt, 15);
-    Logger.log(mn+': 인천'+inc.length+'/가은'+gae.length+'/공동'+jnt.length);
+    Logger.log(mn+': 원본 '+last+'행(헤더제외 '+(last-1)+'건) → 인천'+inc.length+'/가은'+gae.length+'/공동'+jnt.length);
   });
 }
 
