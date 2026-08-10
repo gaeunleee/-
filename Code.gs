@@ -12,8 +12,10 @@
 
 // ── 상수 ──────────────────────────────────────────────────────
 
-/** 데이터 시작 행 (1행 헤더인 경우 2, 헤더 없으면 1) */
-var DATA_START_ROW = 2;
+var SPREADSHEET_ID = '1jMEQxxAh1T581RDyBIE9_0K3bVrnSad1PX8SEyzoGTw';
+
+/** 데이터 시작 행 */
+var DATA_START_ROW = 5;
 
 var JOINT_MERCHANTS   = ['지엠마트', '정육점', '다이소', '신선지엠'];
 var PERSONAL_MERCHANTS = ['올리브영', '미용실', '헤어'];
@@ -414,4 +416,25 @@ function testParse() {
     Logger.log('  분류    : ' + (cl.type === 'joint' ? '공동' : '개인') + ' / ' + cl.category);
     Logger.log('');
   }
+}
+
+// ── 날짜 자동입력 트리거 ─────────────────────────────────────
+// ※ rebuildAll()이 이 함수를 대상으로 onEdit 트리거를 등록합니다.
+
+function onDateEdit(e) {
+  try {
+    var monthMap = {
+      '1월':1,'2월':2,'3월':3,'4월':4,'5월':5,'6월':6,
+      '7월':7,'8월':8,'9월':9,'10월':10,'11월':11,'12월':12
+    };
+    var mn = monthMap[e.range.getSheet().getName()];
+    if (!mn) return;
+    if ([1,8,15,22].indexOf(e.range.getColumn()) === -1) return;
+    var val = e.range.getValue();
+    if (typeof val !== 'number' || val < 1 || val > 31) return;
+    var days = ['일','월','화','수','목','금','토'];
+    var day  = Math.floor(val);
+    var date = new Date(2026, mn-1, day);
+    e.range.setValue(mn + '월 ' + day + '일 (' + days[date.getDay()] + ')');
+  } catch(err) {}
 }
